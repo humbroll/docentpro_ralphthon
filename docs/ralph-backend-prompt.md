@@ -4,8 +4,15 @@ You are implementing the entire backend for **WhenToGo**, a travel date optimiza
 
 ---
 
-## 0. Continuation Protocol
+## 0. Branch & Continuation Protocol
 
+### Branch Setup (FIRST THING)
+```bash
+git checkout -b feat/backend 2>/dev/null || git checkout feat/backend
+```
+Work on `feat/backend` branch ONLY. Never push to `main` directly — a frontend engineer is working on `feat/frontend` in parallel.
+
+### Continuation Protocol
 **If `backend/PROGRESS.md` exists, this is a continuation session.**
 
 1. Read `PROGRESS.md` first
@@ -294,6 +301,8 @@ The spec is the source of truth for test data. Do NOT hardcode test payloads —
 | `backend/pyproject.toml` | Dependencies | **ADD** if needed |
 | `backend/PROGRESS.md` | Progress tracking | **CREATE & UPDATE** |
 | `.env` | API keys | Already configured |
+| `docker-compose.yml` | Docker config | **DO NOT MODIFY** |
+| `CLAUDE.md` | Project guide | **DO NOT MODIFY** |
 
 ---
 

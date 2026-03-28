@@ -4,6 +4,37 @@ You are implementing the entire frontend for **WhenToGo**, a travel date optimiz
 
 ---
 
+## 0. Branch & Continuation Protocol
+
+### Branch Setup (FIRST THING)
+```bash
+git checkout -b feat/frontend 2>/dev/null || git checkout feat/frontend
+```
+Work on `feat/frontend` branch ONLY. Never push to `main` directly — a backend engineer is working on `feat/backend` in parallel.
+
+### Continuation Protocol
+**If `frontend/PROGRESS.md` exists, this is a continuation session.**
+
+1. Read `frontend/PROGRESS.md` first
+2. Read `git log --oneline -10` to see recent changes
+3. Do NOT redo completed work
+4. Continue from where the previous session left off
+5. Skip to the next incomplete step
+
+**If `frontend/PROGRESS.md` does not exist, this is a fresh start.** Proceed from Step 1.
+
+### Progress Tracking
+After completing each step, append to `frontend/PROGRESS.md`:
+```markdown
+## Step N — [Step Name] — [COMPLETED/IN PROGRESS/BLOCKED]
+**Files created/modified**: list of files
+**Decisions made**: any non-obvious choices
+**Issues encountered**: problems and how you solved them
+**Next**: Step N+1
+```
+
+---
+
 ## 1. Project Context
 
 ### What This Product Does
@@ -78,6 +109,12 @@ The spec is split into focused documents. **Read them in this order:**
 | 23 | `docs/frontend/frontend-spec-component-signatures.md` | All component props interfaces (quick reference) |
 | 24 | `docs/frontend/frontend-spec-cross-reference-checklist.md` | Completeness checklist — verify before declaring done |
 | 25 | `docs/frontend/frontend-spec-glossary.md` | Term definitions |
+
+### Mock Fallback Strategy
+The backend may not be running. When API calls fail (connection refused, 500, timeout):
+1. **Wire real API calls first** — always attempt the real endpoint
+2. **Show error state with retry button** on failure — do NOT silently fall back to mock data
+3. **For development/visual testing**: create `frontend/src/lib/mock.ts` with hardcoded example data from `docs/api-spec.yaml` response examples. Use it ONLY in components for initial visual verification, then switch to real API calls.
 
 ### If You Need to Change the Spec
 **STOP and report to the user.** The backend team depends on the API contract.
@@ -206,12 +243,18 @@ const showComparison = options.length >= 2;
 | `frontend/src/components/` | CREATE — all UI components |
 | `frontend/src/types/frontend.ts` | CREATE — frontend-only types |
 | `frontend/src/types/constants.ts` | CREATE — shared constants |
+| `frontend/src/lib/mock.ts` | CREATE — mock data from spec examples |
+| `frontend/PROGRESS.md` | CREATE & UPDATE — progress tracking |
+| `docker-compose.yml` | Docker config | **DO NOT MODIFY** |
+| `CLAUDE.md` | Project guide | **DO NOT MODIFY** |
+| `backend/` | Backend code | **DO NOT TOUCH** |
 
 ---
 
 ## 8. Reminders
 
-1. **Do not modify frozen files** (`api.ts`, `api-spec.yaml`) without reporting
+1. **Run the dev server**: `cd frontend && npm run dev` — runs at `http://localhost:3000`
+2. **Do not modify frozen files** (`api.ts`, `api-spec.yaml`) without reporting
 2. **Read Next.js 16 docs** in `node_modules/next/dist/docs/` — APIs have changed
 3. **Desktop-first** — no mobile/tablet-specific layouts needed
 4. **Default MUI theme** — no custom colors or typography
