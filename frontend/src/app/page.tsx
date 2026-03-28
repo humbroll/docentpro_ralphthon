@@ -69,7 +69,19 @@ export default function HomePage() {
 
   // ── Fetch date details ──
   const fetchFlightPrice = useCallback(async () => {
-    if (!selectedDestination || !dateRange || !selectedDestination.iata_code || originAirport.length !== 3) {
+    if (!selectedDestination || !dateRange) return;
+    if (!selectedDestination.iata_code) {
+      setDateDetailResults((prev) => ({
+        ...prev,
+        flight: { state: 'error', data: null, error: 'This destination has no airport code. Flight lookup unavailable.' },
+      }));
+      return;
+    }
+    if (originAirport.length !== 3) {
+      setDateDetailResults((prev) => ({
+        ...prev,
+        flight: { state: 'error', data: null, error: 'Enter a 3-letter origin airport code to see flight prices.' },
+      }));
       return;
     }
     setDateDetailResults((prev) => ({

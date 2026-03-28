@@ -102,3 +102,18 @@
 - Build: `next build` passes with zero TypeScript errors ✅
 
 **Issues encountered**: MUI 7 renamed Grid2→Grid, React 19 requires explicit useRef initial value. Both fixed in iteration 1.
+
+## Iteration 3-6 — Quality Improvements — COMPLETED
+**Key fixes across iterations**:
+- Fixed prop type: SearchSection accepts `SelectedDestination` (not `DestinationResult`)
+- Removed unnecessary object reconstruction in page.tsx prop passing
+- Added CalendarSection reset on destination change
+- Removed unused `confirmedDateRange` prop from CalendarSection
+- SectionContainer: spec-compliant Fade timing (500ms enter/0ms exit), mountOnEnter/unmountOnExit
+- SectionContainer: scroll-into-view on first reveal using requestAnimationFrame
+- ComparisonQueueFAB: scrolls to comparison section on click
+- EmptyState: supports action CTA button per spec
+- FlightPriceCard: shows error messages when origin airport missing or destination has no IATA code
+- Fixed unused imports in types/frontend.ts
+- Build: `next build` passes with zero TypeScript errors
+- Dev server: returns HTTP 200 on localhost:3000
