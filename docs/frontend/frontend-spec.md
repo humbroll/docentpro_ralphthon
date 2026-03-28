@@ -803,7 +803,7 @@ This section defines **every** layout and navigation component for the single-pa
 
 ```
 RootLayout (Server Component — frontend/src/app/layout.tsx)
-└── ThemeRegistry (Client Component — frontend/src/components/ThemeRegistry.tsx)
+└── ThemeRegistry (Client Component — frontend/src/theme/ThemeRegistry.tsx)
     └── ComparisonQueueProvider (Client Component — frontend/src/context/ComparisonQueueContext.tsx)
         └── AppShell (Client Component — frontend/src/components/layout/AppShell.tsx)
             ├── Header (Client Component — frontend/src/components/layout/Header.tsx)

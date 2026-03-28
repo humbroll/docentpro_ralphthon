@@ -161,7 +161,7 @@ This means the frontend NEVER constructs absolute backend URLs. All API paths ar
 
 MUI 7 with Emotion requires a client-side `ThemeProvider` and Emotion `CacheProvider` to work with Next.js App Router's server-side rendering. Create a `ThemeRegistry` wrapper component.
 
-**File**: `frontend/src/components/ThemeRegistry.tsx`
+**File**: `frontend/src/theme/ThemeRegistry.tsx`
 
 ```typescript
 "use client";
@@ -215,7 +215,7 @@ The existing `frontend/src/app/layout.tsx` must be modified to wrap children in 
 ```typescript
 // frontend/src/app/layout.tsx
 import type { Metadata } from "next";
-import ThemeRegistry from "@/components/ThemeRegistry";
+import ThemeRegistry from "@/theme/ThemeRegistry";
 
 export const metadata: Metadata = {
   title: "WhenToGo — Find Your Best Travel Dates",
@@ -341,7 +341,7 @@ echo 'NEXT_PUBLIC_API_URL=http://localhost:8000' > .env.local
 Apply the configuration shown in Section 0.2.2 above.
 
 ### Step 4: Create the ThemeRegistry component
-Create `src/components/ThemeRegistry.tsx` as shown in Section 0.4.1.
+Create `src/theme/ThemeRegistry.tsx` as shown in Section 0.4.1.
 
 ### Step 5: Update `layout.tsx`
 Modify `src/app/layout.tsx` as shown in Section 0.4.2.

@@ -871,7 +871,7 @@ export function ComparisonQueueProvider({ children }: { children: React.ReactNod
 1. Create `frontend/src/context/ComparisonQueueContext.tsx` using the template in Section 15.
 2. Ensure `ComparisonQueueContextValue`, `ComparisonQueueItem`, and `ComparisonResultState` are defined in `frontend/src/types/frontend.ts` (see `docs/frontend/frontend-spec.md` Section 1.3).
 3. Ensure `MAX_QUEUE_SIZE = 5` and `MIN_COMPARE_SIZE = 2` are defined in `frontend/src/types/constants.ts`.
-4. Ensure `compareTrips` function is defined in `frontend/src/lib/api.ts` (see `docs/frontend/frontend-spec-api-service.md` or `frontend-spec.md`).
+4. Ensure `compareTrips` function is defined in `frontend/src/lib/api.ts` (see `docs/frontend/frontend-spec-api-service-layer.md` or `frontend-spec.md`).
 5. Wrap `{children}` in `ComparisonQueueProvider` inside `layout.tsx`, nested within `ThemeRegistry`.
 6. In every consumer component, import `useComparisonQueue` from `@/context/ComparisonQueueContext` and destructure only the fields needed.
 7. Never create a second context for comparison state — everything goes through this single provider.
