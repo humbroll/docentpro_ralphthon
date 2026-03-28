@@ -3,6 +3,7 @@
 import logging
 from datetime import date
 
+import airportsdata
 from amadeus import Client
 
 from app.api.v1.schemas import DestinationResult, FlightPrice
@@ -11,6 +12,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 _client: Client | None = None
+_airports: dict | None = None
 
 
 def _get_client() -> Client:
@@ -24,27 +26,47 @@ def _get_client() -> Client:
     return _client
 
 
-def search_cities(query: str) -> list[DestinationResult]:
-    """Search cities by keyword. Returns up to 10 results."""
-    client = _get_client()
-    resp = client.reference_data.locations.get(
-        keyword=query,
-        subType=["CITY"],
-    )
-    results: list[DestinationResult] = []
-    for loc in resp.data[:10]:
-        geo = loc.get("geoCode", {})
-        address = loc.get("address", {})
-        results.append(
-            DestinationResult(
-                name=loc.get("name", ""),
-                latitude=geo.get("latitude", 0.0),
-                longitude=geo.get("longitude", 0.0),
-                country=address.get("countryCode", ""),
-                iata_code=loc.get("iataCode"),
-            )
+def _get_airports() -> dict:
+    global _airports
+    if _airports is None:
+        _airports = airportsdata.load("IATA")
+    return _airports
+
+
+def search_cities(
+    query: str,
+) -> list[DestinationResult]:
+    """Search cities using local airportsdata.
+
+    Groups by city+country to avoid duplicates (e.g. Tokyo
+    has NRT and HND). Returns the first airport's IATA code
+    per city. Max 10 results.
+    """
+    q = query.lower()
+    airports = _get_airports()
+    seen: dict[str, DestinationResult] = {}
+
+    for iata, info in airports.items():
+        city = info.get("city", "")
+        name = info.get("name", "")
+        if not city:
+            continue
+        if q not in city.lower() and q not in name.lower():
+            continue
+        key = f"{city.upper()}_{info.get('country', '')}"
+        if key in seen:
+            continue
+        seen[key] = DestinationResult(
+            name=city,
+            latitude=info.get("lat", 0.0),
+            longitude=info.get("lon", 0.0),
+            country=info.get("country", ""),
+            iata_code=iata,
         )
-    return results
+        if len(seen) >= 10:
+            break
+
+    return list(seen.values())
 
 
 def search_flights(
