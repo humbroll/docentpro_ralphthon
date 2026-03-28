@@ -10,9 +10,11 @@ import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
+import { ComparisonColumnHeader } from './ComparisonColumn';
+import { TagChip } from './TagChip';
+import { ScoreBar } from './ScoreBar';
 import type { TripOption } from '@/types/api';
-import { WEATHER_LABEL_COLORS, TAG_COLORS, TAG_LABELS } from '@/types/constants';
+import { WEATHER_LABEL_COLORS } from '@/types/constants';
 import dayjs from 'dayjs';
 
 interface ComparisonTableProps {
@@ -21,7 +23,6 @@ interface ComparisonTableProps {
 }
 
 export function ComparisonTable({ options, bestIndex }: ComparisonTableProps) {
-  // Pre-compute min/max for highlighting
   const highlights = useMemo(() => {
     if (options.length === 0) return { minFlight: 0, minHotel: 0, minTotal: 0, maxScore: 0, maxWeather: 0 };
     return {
@@ -40,29 +41,12 @@ export function ComparisonTable({ options, bestIndex }: ComparisonTableProps) {
           <TableRow>
             <TableCell sx={{ fontWeight: 600 }}>Metric</TableCell>
             {options.map((opt, i) => (
-              <TableCell
+              <ComparisonColumnHeader
                 key={i}
-                align="center"
-                sx={{
-                  fontWeight: 600,
-                  backgroundColor: i === bestIndex ? 'rgba(76, 175, 80, 0.1)' : undefined,
-                }}
-              >
-                <Typography variant="subtitle2" fontWeight={600}>
-                  Option {i + 1}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {opt.destination}, {dayjs(opt.start_date).format('MMM D')}
-                </Typography>
-                {i === bestIndex && (
-                  <Chip
-                    label="Best Overall"
-                    size="small"
-                    color="warning"
-                    sx={{ display: 'block', mt: 0.5, mx: 'auto', width: 'fit-content' }}
-                  />
-                )}
-              </TableCell>
+                option={opt}
+                index={i}
+                isBest={i === bestIndex}
+              />
             ))}
           </TableRow>
         </TableHead>
@@ -133,7 +117,7 @@ export function ComparisonTable({ options, bestIndex }: ComparisonTableProps) {
             ))}
           </TableRow>
 
-          {/* Total cost — highlighted row */}
+          {/* Total cost */}
           <TableRow sx={{ backgroundColor: 'grey.50' }}>
             <TableCell sx={{ fontWeight: 600 }}>Total Cost</TableCell>
             {options.map((opt, i) => (
@@ -158,26 +142,12 @@ export function ComparisonTable({ options, bestIndex }: ComparisonTableProps) {
             ))}
           </TableRow>
 
-          {/* Overall score — highlighted row */}
+          {/* Overall score with ScoreBar */}
           <TableRow sx={{ backgroundColor: 'grey.50' }}>
             <TableCell sx={{ fontWeight: 600 }}>Overall Score</TableCell>
             {options.map((opt, i) => (
-              <TableCell
-                key={i}
-                align="center"
-                sx={{
-                  fontWeight: 700,
-                  fontSize: '1.1rem',
-                  color: opt.overall_score === highlights.maxScore
-                    ? 'success.main'
-                    : opt.overall_score >= 60
-                      ? 'info.main'
-                      : opt.overall_score >= 40
-                        ? 'warning.main'
-                        : 'error.main',
-                }}
-              >
-                {opt.overall_score.toFixed(1)}
+              <TableCell key={i} align="center">
+                <ScoreBar score={opt.overall_score} />
               </TableCell>
             ))}
           </TableRow>
@@ -189,13 +159,7 @@ export function ComparisonTable({ options, bestIndex }: ComparisonTableProps) {
               <TableCell key={i} align="center">
                 <Stack direction="row" spacing={0.5} justifyContent="center" flexWrap="wrap">
                   {opt.tags.map((tag) => (
-                    <Chip
-                      key={tag}
-                      label={TAG_LABELS[tag] ?? tag}
-                      size="small"
-                      color={TAG_COLORS[tag] ?? 'default'}
-                      variant="filled"
-                    />
+                    <TagChip key={tag} tag={tag} />
                   ))}
                 </Stack>
               </TableCell>

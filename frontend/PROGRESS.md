@@ -162,11 +162,46 @@
 
 **Build**: `next build` passes with zero TypeScript errors ✅
 
+## Iteration 9 — Extract Missing Components & Hooks — COMPLETED
+**Files created (22 new files)**:
+- `src/hooks/useDebounce.ts` — Generic debounce utility hook
+- `src/hooks/useSearchParams.ts` — Search params state hook
+- `src/hooks/useDateRange.ts` — Date range state hook
+- `src/hooks/useHotelSelection.ts` — Hotel selection state hook
+- `src/hooks/useDestinationSearch.ts` — Debounced destination search hook
+- `src/hooks/useCalendarWeather.ts` — Calendar weather fetch hook
+- `src/hooks/useDateDetails.ts` — Parallel flight/hotel/weather fetch hook
+- `src/hooks/useAddToQueue.ts` — Queue addition logic hook
+- `src/components/layout/PageContainer.tsx` — Container wrapper
+- `src/components/shared/LoadingIndicator.tsx` — CircularProgress wrapper
+- `src/components/calendar/WeatherLegend.tsx` — Weather label color legend
+- `src/components/dateOption/AddToQueueButton.tsx` — Queue add button with feedback
+- `src/components/comparison/ComparisonQueuePanel.tsx` — Queue items grid panel
+- `src/components/comparison/CompareButton.tsx` — Compare trigger button
+- `src/components/comparison/BestOptionBanner.tsx` — Winner alert banner
+- `src/components/comparison/ScoreSummaryCards.tsx` — Tag summary chips
+- `src/components/comparison/TagChip.tsx` — Individual tag chip
+- `src/components/comparison/ScoreBar.tsx` — Score visualization bar
+- `src/components/comparison/ComparisonColumn.tsx` — Table column header
+- `src/components/comparison/ComparisonTableSkeleton.tsx` — Loading skeleton
+- `src/components/comparison/CostBreakdownChart.tsx` — Cost breakdown visualization
+- `src/components/comparison/ScoreComparisonChart.tsx` — Score comparison visualization
+
+**Files modified (4 files)**:
+- `src/components/calendar/CalendarSection.tsx` — Uses WeatherLegend component
+- `src/components/dateOption/DateOptionBuilderSection.tsx` — Uses AddToQueueButton component
+- `src/components/comparison/ComparisonSection.tsx` — Uses ComparisonQueuePanel, CompareButton, BestOptionBanner, ScoreSummaryCards, ComparisonTableSkeleton, CostBreakdownChart, ScoreComparisonChart
+- `src/components/comparison/ComparisonTable.tsx` — Uses ComparisonColumnHeader, TagChip, ScoreBar
+
+**Build**: `next build` passes with zero TypeScript errors ✅
+
 ## Cross-Reference Checklist — FINAL VERIFICATION ✅
 - **API Endpoints**: 7/7 wired (health, destinations, flights, hotels, weather, calendar, compare)
 - **Types**: 39/39 defined (14 API types, 14 frontend types, 13 constants)
-- **Components**: 30/30 exist across layout/search/calendar/dateOption/comparison/shared
+- **Components**: 37/37 exist as separate files across layout/search/calendar/dateOption/comparison/shared
+- **Hooks**: 9/9 exist (useComparisonQueue, useDestinationSearch, useCalendarWeather, useDateDetails, useSearchParams, useDateRange, useHotelSelection, useAddToQueue, useDebounce)
 - **Edge Cases**: All handled (queue full, duplicates, sub-minimum, cascade reset, IATA null, network errors, empty states)
 - **Progressive Reveal**: 4-section state machine with derived visibility
 - **Build**: Zero TypeScript errors
 - **Dev Server**: HTTP 200
+- **All checklist A–G items**: Every component, type, constant, hook, and edge case from `frontend-spec-cross-reference-checklist.md` has a corresponding file

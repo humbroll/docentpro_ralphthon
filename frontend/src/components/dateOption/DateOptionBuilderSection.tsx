@@ -4,11 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
-import Button from '@mui/material/Button';
-import Tooltip from '@mui/material/Tooltip';
-import AddIcon from '@mui/icons-material/Add';
-import CheckIcon from '@mui/icons-material/Check';
 import { FlightPriceCard } from './FlightPriceCard';
+import { AddToQueueButton } from './AddToQueueButton';
 import { HotelSelectionCard } from './HotelSelectionCard';
 import { WeatherSummaryCard } from './WeatherSummaryCard';
 import { useComparisonQueue } from '@/context/ComparisonQueueContext';
@@ -143,20 +140,16 @@ export function DateOptionBuilderSection({
       </Grid>
 
       <Box sx={{ mt: 3, textAlign: 'right' }}>
-        <Tooltip title={getTooltip()} arrow open={justAdded || undefined}>
-          <span>
-            <Button
-              variant="contained"
-              size="large"
-              color={justAdded ? 'success' : 'primary'}
-              startIcon={justAdded ? <CheckIcon /> : <AddIcon />}
-              onClick={handleAddToQueue}
-              disabled={!canAdd || isFull || isDuplicate || justAdded}
-            >
-              {justAdded ? 'Added!' : isDuplicate ? 'Already in Queue' : isFull ? 'Queue Full' : 'Add to Queue'}
-            </Button>
-          </span>
-        </Tooltip>
+        <AddToQueueButton
+          onClick={handleAddToQueue}
+          disabled={!canAdd || isFull || isDuplicate || justAdded}
+          justAdded={justAdded}
+          isFull={isFull}
+          isDuplicate={isDuplicate}
+          allLoaded={!!allLoaded}
+          originValid={originAirport.length === 3}
+          tooltip={getTooltip()}
+        />
       </Box>
     </Box>
   );

@@ -16,7 +16,7 @@ import { InlineError } from '../shared/InlineError';
 import { getCalendarWeather, extractApiError } from '@/lib/api';
 import type { CalendarDay } from '@/types/api';
 import type { SelectedDestination, DateRange, CalendarWeatherState } from '@/types/frontend';
-import { WEATHER_LABEL_COLORS } from '@/types/constants';
+import { WeatherLegend } from './WeatherLegend';
 import dayjs from 'dayjs';
 
 interface CalendarSectionProps {
@@ -128,18 +128,7 @@ export function CalendarSection({
         </Stack>
 
         {/* Weather Legend */}
-        <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 2, mb: 2 }}>
-          {Object.entries(WEATHER_LABEL_COLORS).map(([label, color]) => (
-            <Stack key={label} direction="row" spacing={0.5} alignItems="center">
-              <Box sx={{ width: 12, height: 12, borderRadius: '2px', backgroundColor: color }} />
-              <Typography variant="caption">{label}</Typography>
-            </Stack>
-          ))}
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            <Box sx={{ width: 12, height: 12, borderRadius: '2px', border: 1, borderColor: 'divider' }} />
-            <Typography variant="caption">No data</Typography>
-          </Stack>
-        </Stack>
+        <WeatherLegend />
 
         {/* Calendar Grids */}
         {calendarWeather.state === 'loading' ? (
