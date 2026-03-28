@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Container from '@mui/material/Container';
-import Box from '@mui/material/Box';
 import { SearchSection } from '@/components/search/SearchSection';
 import { CalendarSection } from '@/components/calendar/CalendarSection';
 import { DateOptionBuilderSection } from '@/components/dateOption/DateOptionBuilderSection';
@@ -167,62 +165,60 @@ export default function HomePage() {
   }, [dateRange, selectedDestination, fetchFlightPrice, fetchHotels, fetchWeather]);
 
   return (
-    <Box component="main">
-      <Container maxWidth="lg">
-        {/* Section 1: Search (always visible) */}
-        <SearchSection
-          selectedDestination={
-            selectedDestination
-              ? {
-                  name: selectedDestination.name,
-                  latitude: selectedDestination.latitude,
-                  longitude: selectedDestination.longitude,
-                  country: selectedDestination.country,
-                  iata_code: selectedDestination.iata_code,
-                }
-              : null
-          }
-          onDestinationChange={handleDestinationChange}
-          originAirport={originAirport}
-          onOriginAirportChange={setOriginAirport}
-          travelerCount={travelerCount}
-          onTravelerCountChange={setTravelerCount}
-        />
+    <>
+      {/* Section 1: Search (always visible) */}
+      <SearchSection
+        selectedDestination={
+          selectedDestination
+            ? {
+                name: selectedDestination.name,
+                latitude: selectedDestination.latitude,
+                longitude: selectedDestination.longitude,
+                country: selectedDestination.country,
+                iata_code: selectedDestination.iata_code,
+              }
+            : null
+        }
+        onDestinationChange={handleDestinationChange}
+        originAirport={originAirport}
+        onOriginAirportChange={setOriginAirport}
+        travelerCount={travelerCount}
+        onTravelerCountChange={setTravelerCount}
+      />
 
-        {/* Section 2: Calendar (after destination selected) */}
-        <SectionContainer visible={showCalendar}>
-          {selectedDestination && (
-            <CalendarSection
-              destination={selectedDestination}
-              onDateRangeConfirm={handleDateRangeConfirm}
-              confirmedDateRange={dateRange}
-            />
-          )}
-        </SectionContainer>
+      {/* Section 2: Calendar (after destination selected) */}
+      <SectionContainer visible={showCalendar}>
+        {selectedDestination && (
+          <CalendarSection
+            destination={selectedDestination}
+            onDateRangeConfirm={handleDateRangeConfirm}
+            confirmedDateRange={dateRange}
+          />
+        )}
+      </SectionContainer>
 
-        {/* Section 3: Date Details (after date range confirmed) */}
-        <SectionContainer visible={showDateDetails}>
-          {selectedDestination && dateRange && (
-            <DateOptionBuilderSection
-              destination={selectedDestination}
-              dateRange={dateRange}
-              results={dateDetailResults}
-              originAirport={originAirport}
-              travelerCount={travelerCount}
-              selectedHotel={selectedHotel}
-              onSelectHotel={setSelectedHotel}
-              onRetryFlight={fetchFlightPrice}
-              onRetryHotels={fetchHotels}
-              onRetryWeather={fetchWeather}
-            />
-          )}
-        </SectionContainer>
+      {/* Section 3: Date Details (after date range confirmed) */}
+      <SectionContainer visible={showDateDetails}>
+        {selectedDestination && dateRange && (
+          <DateOptionBuilderSection
+            destination={selectedDestination}
+            dateRange={dateRange}
+            results={dateDetailResults}
+            originAirport={originAirport}
+            travelerCount={travelerCount}
+            selectedHotel={selectedHotel}
+            onSelectHotel={setSelectedHotel}
+            onRetryFlight={fetchFlightPrice}
+            onRetryHotels={fetchHotels}
+            onRetryWeather={fetchWeather}
+          />
+        )}
+      </SectionContainer>
 
-        {/* Section 4: Comparison (after ≥1 queue items) */}
-        <SectionContainer visible={showComparison}>
-          <ComparisonSection />
-        </SectionContainer>
-      </Container>
-    </Box>
+      {/* Section 4: Comparison (after ≥1 queue items) */}
+      <SectionContainer visible={showComparison}>
+        <ComparisonSection />
+      </SectionContainer>
+    </>
   );
 }

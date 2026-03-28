@@ -27,3 +27,19 @@ export const RAIN_SIGNAL_COLORS: Record<string, string> = {
   medium: "#ff9800",
   high: "#f44336",
 };
+
+export const TAG_COLORS: Record<string, "success" | "info" | "warning"> = {
+  cheapest: "success",
+  best_weather: "info",
+  best_overall: "warning",
+};
+
+export const TAG_LABELS: Record<string, string> = {
+  cheapest: "Cheapest",
+  best_weather: "Best Weather",
+  best_overall: "Best Overall",
+};
+
+export const CURRENCY_SYMBOL = "$";
+
+export const CURRENCY_CODE = "USD";

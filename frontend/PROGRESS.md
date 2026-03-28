@@ -73,3 +73,32 @@
 - Cascading reset: changing destination clears date range and all results
 
 **Next**: Step 7 — Verify
+
+## Step 7 — Verify & Cross-Reference — COMPLETED
+**Files created/modified**:
+- `src/components/layout/Header.tsx` — AppBar with WhenToGo branding + queue badge
+- `src/components/layout/Footer.tsx` — Simple informational footer
+- `src/components/layout/AppShell.tsx` — Full-viewport flex layout shell
+- `src/components/layout/ComparisonQueueFAB.tsx` — Fixed FAB with queue count badge
+- `src/components/shared/EmptyState.tsx` — Reusable empty state placeholder
+- `src/lib/mock.ts` — Mock data for all endpoints (destinations, flights, hotels, weather, calendar, compare)
+- `src/types/index.ts` — Type re-export barrel
+- `src/types/constants.ts` — Added TAG_COLORS, TAG_LABELS, CURRENCY_SYMBOL, CURRENCY_CODE
+- `src/app/layout.tsx` — Updated to wrap children in AppShell
+- `src/app/page.tsx` — Removed Container wrapper (AppShell provides it)
+
+**Cross-reference checklist results**:
+- All layout components: Header, Footer, AppShell, ComparisonQueueFAB, SectionContainer ✅
+- All search components: SearchSection, DestinationAutocomplete, OriginAirportInput, TravelerCountInput ✅
+- All calendar components: CalendarSection, CalendarMonthGrid, CalendarDayCell ✅
+- All date detail components: DateOptionBuilderSection, FlightPriceCard, HotelSelectionCard, WeatherSummaryCard ✅
+- All comparison components: ComparisonSection, ComparisonTable, QueueItemCard ✅
+- All shared components: InlineError, EmptyState ✅
+- All API endpoints wired: 7/7 (health, destinations, flights, hotels, weather, calendar, compare) ✅
+- All types defined: api.ts (frozen), frontend.ts, constants.ts, index.ts ✅
+- Context provider: ComparisonQueueContext with queue, addItem, removeItem, clearQueue, compareTrips ✅
+- Progressive reveal: 4 sections with derived visibility ✅
+- Mock data: Available for all endpoints ✅
+- Build: `next build` passes with zero TypeScript errors ✅
+
+**Issues encountered**: MUI 7 renamed Grid2→Grid, React 19 requires explicit useRef initial value. Both fixed in iteration 1.

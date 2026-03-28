@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import ThemeRegistry from "@/theme/ThemeRegistry";
 import { ComparisonQueueProvider } from "@/context/ComparisonQueueContext";
+import AppShell from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
   title: "WhenToGo — Find Your Best Travel Dates",
@@ -17,7 +18,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <ThemeRegistry>
-          <ComparisonQueueProvider>{children}</ComparisonQueueProvider>
+          <ComparisonQueueProvider>
+            <AppShell>{children}</AppShell>
+          </ComparisonQueueProvider>
         </ThemeRegistry>
       </body>
     </html>
