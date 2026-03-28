@@ -40,6 +40,13 @@ export function CalendarSection({
     error: null,
   });
 
+  // Reset date selection when destination changes
+  useEffect(() => {
+    setStartDate(null);
+    setEndDate(null);
+    setHoveredDate(null);
+  }, [destination.name, destination.latitude, destination.longitude]);
+
   const fetchCalendarWeather = useCallback(async () => {
     const start = viewMonth.format('YYYY-MM-DD');
     const end = viewMonth.add(2, 'month').subtract(1, 'day').format('YYYY-MM-DD');

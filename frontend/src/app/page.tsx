@@ -168,17 +168,7 @@ export default function HomePage() {
     <>
       {/* Section 1: Search (always visible) */}
       <SearchSection
-        selectedDestination={
-          selectedDestination
-            ? {
-                name: selectedDestination.name,
-                latitude: selectedDestination.latitude,
-                longitude: selectedDestination.longitude,
-                country: selectedDestination.country,
-                iata_code: selectedDestination.iata_code,
-              }
-            : null
-        }
+        selectedDestination={selectedDestination}
         onDestinationChange={handleDestinationChange}
         originAirport={originAirport}
         onOriginAirportChange={setOriginAirport}

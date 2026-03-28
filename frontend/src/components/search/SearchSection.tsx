@@ -8,9 +8,10 @@ import { DestinationAutocomplete } from './DestinationAutocomplete';
 import { OriginAirportInput } from './OriginAirportInput';
 import { TravelerCountInput } from './TravelerCountInput';
 import type { DestinationResult } from '@/types/api';
+import type { SelectedDestination } from '@/types/frontend';
 
 interface SearchSectionProps {
-  selectedDestination: DestinationResult | null;
+  selectedDestination: SelectedDestination | null;
   onDestinationChange: (destination: DestinationResult | null) => void;
   originAirport: string;
   onOriginAirportChange: (value: string) => void;
