@@ -33,19 +33,51 @@ def _get_airports() -> dict:
     return _airports
 
 
+# Well-known hub airports that should always be preferred
+_HUB_AIRPORTS = {
+    "LHR", "CDG", "JFK", "LAX", "SFO", "ORD", "ATL",
+    "NRT", "HND", "ICN", "PEK", "PVG", "SIN", "HKG",
+    "DXB", "AMS", "FRA", "FCO", "BCN", "MAD", "MUC",
+    "SYD", "MEL", "BKK", "DEL", "BOM", "GRU", "EZE",
+    "MEX", "YYZ", "YVR", "MIA", "BOS", "SEA", "DEN",
+    "DFW", "IAH", "EWR", "LGA", "PHX", "MSP", "DTW",
+}
+
+
+def _airport_priority(iata: str, name: str) -> int:
+    """Lower = better. Prefer major hub airports."""
+    if iata in _HUB_AIRPORTS:
+        return 0
+    n = name.lower()
+    if "international" in n:
+        return 1
+    if "regional" in n or "municipal" in n:
+        return 3
+    if any(
+        w in n
+        for w in (
+            "seaplane", "heliport", "airpark",
+            "airfield", "raf ",
+        )
+    ):
+        return 4
+    return 2
+
+
 def search_cities(
     query: str,
 ) -> list[DestinationResult]:
     """Search cities using local airportsdata.
 
-    Groups by city+country to avoid duplicates (e.g. Tokyo
-    has NRT and HND). Returns the first airport's IATA code
-    per city. Max 10 results.
+    Groups by city+country. For each city picks the main
+    airport (international > regular > regional > seaplane).
+    Max 10 results.
     """
     q = query.lower()
     airports = _get_airports()
-    seen: dict[str, DestinationResult] = {}
 
+    # Collect all matching airports per city
+    city_airports: dict[str, list[tuple[int, str, dict]]] = {}
     for iata, info in airports.items():
         city = info.get("city", "")
         name = info.get("name", "")
@@ -54,19 +86,34 @@ def search_cities(
         if q not in city.lower() and q not in name.lower():
             continue
         key = f"{city.upper()}_{info.get('country', '')}"
-        if key in seen:
-            continue
-        seen[key] = DestinationResult(
-            name=city,
-            latitude=info.get("lat", 0.0),
-            longitude=info.get("lon", 0.0),
-            country=info.get("country", ""),
-            iata_code=iata,
-        )
-        if len(seen) >= 10:
-            break
+        priority = _airport_priority(iata, name)
+        if key not in city_airports:
+            city_airports[key] = []
+        city_airports[key].append((priority, iata, info))
 
-    return list(seen.values())
+    # Pick best airport per city, build results
+    city_results: list[tuple[int, DestinationResult]] = []
+    for key, aps in city_airports.items():
+        aps.sort(key=lambda x: x[0])
+        _, iata, info = aps[0]
+        city_name = info.get("city", "")
+        # Exact city name match ranks higher
+        exact = 0 if city_name.lower() == q else 1
+        city_results.append(
+            (
+                exact,
+                DestinationResult(
+                    name=city_name,
+                    latitude=info.get("lat", 0.0),
+                    longitude=info.get("lon", 0.0),
+                    country=info.get("country", ""),
+                    iata_code=iata,
+                ),
+            )
+        )
+
+    city_results.sort(key=lambda x: x[0])
+    return [r for _, r in city_results[:10]]
 
 
 def search_flights(
