@@ -61,10 +61,10 @@ export async function healthCheck(): Promise<{ status: string }> {
   return response.data;
 }
 
-export async function searchDestinations(query: string): Promise<DestinationResult[]> {
+export async function searchDestinations(query: string, signal?: AbortSignal): Promise<DestinationResult[]> {
   const response = await apiClient.get<DestinationResult[]>(
     '/api/v1/search/destinations',
-    { params: { q: query } },
+    { params: { q: query }, signal },
   );
   return response.data;
 }

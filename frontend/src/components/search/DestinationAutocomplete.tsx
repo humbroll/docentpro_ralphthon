@@ -22,24 +22,36 @@ export function DestinationAutocomplete({ value, onChange, error }: DestinationA
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | undefined>(undefined);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const abortRef = useRef<AbortController | undefined>(undefined);
 
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (abortRef.current) abortRef.current.abort();
     };
   }, []);
 
   const fetchDestinations = async (query: string): Promise<void> => {
+    // Cancel any in-flight request
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsLoading(true);
     setFetchError(undefined);
     try {
-      const results = await searchDestinations(query);
-      setOptions(results);
-    } catch {
+      const results = await searchDestinations(query, controller.signal);
+      if (!controller.signal.aborted) {
+        setOptions(results);
+      }
+    } catch (err) {
+      if (controller.signal.aborted) return;
       setFetchError('Failed to search destinations. Please try again.');
       setOptions([]);
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -49,6 +61,8 @@ export function DestinationAutocomplete({ value, onChange, error }: DestinationA
     if (newInputValue.length < MIN_SEARCH_QUERY_LENGTH) {
       setOptions([]);
       setFetchError(undefined);
+      if (abortRef.current) abortRef.current.abort();
+      setIsLoading(false);
       return;
     }
     debounceRef.current = setTimeout(() => {

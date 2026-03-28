@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardHeader from '@mui/material/CardHeader';
 import CardContent from '@mui/material/CardContent';
@@ -7,12 +9,22 @@ import Typography from '@mui/material/Typography';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
 import WbSunnyIcon from '@mui/icons-material/WbSunny';
 import CloudOffOutlinedIcon from '@mui/icons-material/CloudOffOutlined';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { InlineError } from '../shared/InlineError';
 import type { WeatherSummary } from '@/types/api';
 import type { LoadingState } from '@/types/frontend';
 import { WEATHER_LABEL_COLORS, RAIN_SIGNAL_COLORS } from '@/types/constants';
+import dayjs from 'dayjs';
 
 interface WeatherSummaryCardProps {
   state: LoadingState;
@@ -27,6 +39,8 @@ export function WeatherSummaryCard({
   error,
   onRetry,
 }: WeatherSummaryCardProps) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <Card variant="outlined" sx={{ height: '100%' }}>
       <CardHeader
@@ -83,7 +97,68 @@ export function WeatherSummaryCard({
                 }}
               />
             </Stack>
+
+            {/* Daily Breakdown */}
+            {weather.daily && weather.daily.length > 0 && (
+              <Accordion
+                expanded={expanded}
+                onChange={(_, isExpanded) => setExpanded(isExpanded)}
+                disableGutters
+                elevation={0}
+                sx={{ '&::before': { display: 'none' } }}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 0, minHeight: 'auto' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Daily breakdown ({weather.daily.length} days)
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ px: 0, pt: 0 }}>
+                  <Box sx={{ overflowX: 'auto' }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ py: 0.5, fontSize: '0.75rem' }}>Date</TableCell>
+                          <TableCell sx={{ py: 0.5, fontSize: '0.75rem' }} align="right">High</TableCell>
+                          <TableCell sx={{ py: 0.5, fontSize: '0.75rem' }} align="right">Low</TableCell>
+                          <TableCell sx={{ py: 0.5, fontSize: '0.75rem' }} align="right">Rain</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {weather.daily.map((day) => (
+                          <TableRow key={day.date}>
+                            <TableCell sx={{ py: 0.5, fontSize: '0.75rem' }}>
+                              {dayjs(day.date).format('MMM D')}
+                            </TableCell>
+                            <TableCell sx={{ py: 0.5, fontSize: '0.75rem' }} align="right">
+                              {Math.round(day.temp_high)}°
+                            </TableCell>
+                            <TableCell sx={{ py: 0.5, fontSize: '0.75rem' }} align="right">
+                              {Math.round(day.temp_low)}°
+                            </TableCell>
+                            <TableCell sx={{ py: 0.5, fontSize: '0.75rem' }} align="right">
+                              {day.rain_mm.toFixed(1)}mm
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                </AccordionDetails>
+              </Accordion>
+            )}
           </Stack>
+        )}
+
+        {state === 'success' && !weather && (
+          <Box sx={{ textAlign: 'center', py: 3 }}>
+            <CloudOffOutlinedIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary" fontWeight={500}>
+              No weather data available
+            </Typography>
+            <Typography variant="caption" color="text.disabled">
+              Historical data may not be available for this location.
+            </Typography>
+          </Box>
         )}
 
         {state === 'idle' && (
