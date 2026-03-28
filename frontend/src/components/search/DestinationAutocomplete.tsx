@@ -103,6 +103,7 @@ export function DestinationAutocomplete({ value, onChange, error }: DestinationA
         />
       )}
       renderOption={(props, option) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { key, ...restProps } = props;
         return (
           <li key={`${option.name}-${option.iata_code ?? option.country}`} {...restProps}>

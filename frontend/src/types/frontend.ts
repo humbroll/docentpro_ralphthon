@@ -2,12 +2,10 @@
 // Frontend-only types for UI state management. Never sent to or received from the API.
 
 import type {
-  DestinationResult,
   FlightPrice,
   HotelOption,
   WeatherSummary,
   CalendarDay,
-  TripOption,
   CompareResponse,
 } from "./api";
 

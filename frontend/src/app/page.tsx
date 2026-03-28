@@ -61,11 +61,11 @@ export default function HomePage() {
     setSelectedHotel(null);
   };
 
-  const handleDateRangeConfirm = (range: DateRange) => {
+  const handleDateRangeConfirm = useCallback((range: DateRange) => {
     setDateRange(range);
     setDateDetailResults(INITIAL_DETAIL_RESULTS);
     setSelectedHotel(null);
-  };
+  }, []);
 
   // ── Fetch date details ──
   const fetchFlightPrice = useCallback(async () => {
@@ -182,7 +182,6 @@ export default function HomePage() {
           <CalendarSection
             destination={selectedDestination}
             onDateRangeConfirm={handleDateRangeConfirm}
-            confirmedDateRange={dateRange}
           />
         )}
       </SectionContainer>

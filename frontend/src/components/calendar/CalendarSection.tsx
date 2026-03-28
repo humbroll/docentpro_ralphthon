@@ -22,13 +22,11 @@ import dayjs from 'dayjs';
 interface CalendarSectionProps {
   destination: SelectedDestination;
   onDateRangeConfirm: (dateRange: DateRange) => void;
-  confirmedDateRange: DateRange | null;
 }
 
 export function CalendarSection({
   destination,
   onDateRangeConfirm,
-  confirmedDateRange,
 }: CalendarSectionProps) {
   const [viewMonth, setViewMonth] = useState<dayjs.Dayjs>(() => dayjs().startOf('month'));
   const [startDate, setStartDate] = useState<dayjs.Dayjs | null>(null);
