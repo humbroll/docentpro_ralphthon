@@ -64,9 +64,9 @@ cd frontend && npm run lint
 
 ## Environment Variables
 See `.env.example` for required keys:
-- `AMADEUS_API_KEY` / `AMADEUS_API_SECRET`
-- `LITEAPI_API_KEY`
-- `WEATHER_API_KEY`
+- `AMADEUS_API_KEY` / `AMADEUS_API_SECRET` (OAuth2, SDK handles token refresh)
+- `LITEAPI_API_KEY_SEARCH` (hotel search) / `LITEAPI_API_KEY_RATES` (hotel pricing)
+- Weather: Open-Meteo Historical API — no key required (free)
 
 ## URLs
 - Frontend: http://localhost:3000

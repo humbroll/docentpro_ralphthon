@@ -43,9 +43,9 @@ info:
     ## External APIs
     | Service | Provider | Auth |
     |---------|----------|------|
-    | Destination search | Amadeus City Search | API key + secret |
-    | Flight pricing | Amadeus Flight Offers | API key + secret |
-    | Hotel search | LiteAPI | API key |
+    | Destination search | Amadeus City Search | API key + secret (OAuth2) |
+    | Flight pricing | Amadeus Flight Offers | API key + secret (OAuth2) |
+    | Hotel search | LiteAPI | 2 API keys (search + rates) |
     | Weather | Open-Meteo Historical | None (free) |
 
     ## Conventions
@@ -106,10 +106,10 @@ paths:
         - name: q
           in: query
           required: true
-          description: City name search query (minimum 2 characters)
+          description: City name search query (minimum 3 characters, Amadeus API requirement)
           schema:
             type: string
-            minLength: 2
+            minLength: 3
             example: "Tokyo"
       responses:
         "200":
@@ -200,9 +200,18 @@ paths:
         Searches for hotels using LiteAPI. Returns the top 5 hotels
         sorted by total stay price (ascending).
 
-        Room calculation: `rooms_needed = ceil(traveler_count / 2)`
+        ### Implementation Note (2-step LiteAPI flow)
+        1. `GET /data/hotels` — search by lat/lon, returns hotel metadata (no prices)
+        2. `POST /hotels/min-rates` — fetch prices for found hotel IDs
 
-        `total_price` = price per room per night * rooms_needed * number of nights.
+        Requires 2 separate LiteAPI keys:
+        - `LITEAPI_API_KEY_SEARCH` (Normal User Group) for step 1
+        - `LITEAPI_API_KEY_RATES` (Closed User Group) for step 2
+
+        Room calculation: `rooms_needed = ceil(traveler_count / 2)`
+        LiteAPI occupancies split: e.g., 5 travelers → `[{adults:2},{adults:2},{adults:1}]`
+
+        `total_price` = total cost returned by LiteAPI min-rates for all rooms and nights.
         The user selects 1 hotel from the results to include in their trip option.
       requestBody:
         required: true
@@ -811,7 +820,7 @@ components:
           type: number
           format: double
           nullable: true
-          description: Distance from city center in km (null if unavailable)
+          description: Distance from city center in km, calculated via Haversine from hotel coordinates (null if unavailable)
           example: 1.2
         total_price:
           type: number
