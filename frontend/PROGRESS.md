@@ -117,3 +117,32 @@
 - Fixed unused imports in types/frontend.ts
 - Build: `next build` passes with zero TypeScript errors
 - Dev server: returns HTTP 200 on localhost:3000
+
+## Iteration 7 — UX Polish & Spec Compliance — COMPLETED
+**Files modified**:
+- `src/components/calendar/CalendarDayCell.tsx` — selected state styling, accessibility, keyboard nav
+- `src/components/comparison/ComparisonSection.tsx` — empty/sub-minimum states, tooltips
+- `src/components/comparison/ComparisonTable.tsx` — subtle alpha highlight, shared constants
+- `src/components/dateOption/DateOptionBuilderSection.tsx` — "Added!" feedback, formatted dates
+- `src/components/dateOption/HotelSelectionCard.tsx` — proper empty state with icon
+- `src/components/dateOption/WeatherSummaryCard.tsx` — score baseline alignment
+- `src/components/search/DestinationAutocomplete.tsx` — id for focus targeting, idle helper text
+- `src/components/shared/InlineError.tsx` — compact Alert-based layout
+
+**Key improvements**:
+- CalendarDayCell: primary.main bg + white text for start/end dates, weather-aware hover, aria-labels, keyboard support
+- ComparisonSection: EmptyState with CTA "Search Destinations" (scrolls to top + focuses input), sub-minimum alert for 1 item, disabled Compare tooltip
+- AddToQueueButton: "Added!" flash feedback (1.5s green), better disabled state labels (Already in Queue / Queue Full)
+- ComparisonTable: subtle rgba(76,175,80,0.1) highlight instead of opaque success.light
+- HotelSelectionCard: ApartmentOutlined icon + message for empty hotel results
+- InlineError: retry button inline with Alert action slot (more compact)
+- DestinationAutocomplete: id="destination-search-input" for focus-from-empty-state, idle helper text
+
+**Build**: `next build` passes with zero TypeScript errors ✅
+
+**Remaining spec gaps (lower priority)**:
+- WeatherLegend could be extracted to its own component (currently inline in CalendarSection)
+- CostBreakdownChart / ScoreComparisonChart (spec §5-6 of compare section) — decorative, no blocking functionality
+- ComparisonTableSkeleton (loading skeleton for compare table)
+- Daily weather breakdown accordion in WeatherSummaryCard
+- AbortController in DestinationAutocomplete for canceling stale requests
