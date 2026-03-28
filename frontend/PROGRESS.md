@@ -144,5 +144,12 @@
 - WeatherLegend could be extracted to its own component (currently inline in CalendarSection)
 - CostBreakdownChart / ScoreComparisonChart (spec §5-6 of compare section) — decorative, no blocking functionality
 - ComparisonTableSkeleton (loading skeleton for compare table)
-- Daily weather breakdown accordion in WeatherSummaryCard
-- AbortController in DestinationAutocomplete for canceling stale requests
+
+## Iteration 7b — Weather Accordion + AbortController — COMPLETED
+**Files modified**:
+- `src/components/dateOption/WeatherSummaryCard.tsx` — daily breakdown accordion, empty state
+- `src/components/search/DestinationAutocomplete.tsx` — AbortController for stale requests
+- `src/lib/api.ts` — searchDestinations accepts AbortSignal
+
+**Build**: `next build` passes with zero TypeScript errors ✅
+**Dev server**: returns HTTP 200 on localhost:3000 ✅
