@@ -127,6 +127,15 @@ After completing Phase 3:
 
 Read `docs/api-spec.yaml`, derive curl test commands from the spec's example payloads, and test every endpoint. Fix any failures. Update `backend/PROGRESS.md` with results.
 
+### Phase 5: Test Code (pytest)
+
+Write pytest integration tests for every endpoint. See Section 8.5 for details.
+- Create `backend/tests/` directory with test files for each endpoint
+- Each test file covers happy path + error cases
+- Run: `docker compose run --rm backend pytest tests/ -v`
+- All tests must pass
+- Update `backend/PROGRESS.md`
+
 ---
 
 ## 4. Implementation Guide
@@ -269,6 +278,95 @@ The spec is the source of truth for test data. Do NOT hardcode test payloads —
 
 ---
 
+## 8.5. Test Code (pytest)
+
+After all endpoints pass curl verification, write **pytest tests** for every endpoint.
+
+### Test Structure
+Create `backend/tests/` with this layout:
+```
+backend/tests/
+├── conftest.py          # shared fixtures (TestClient, mock data)
+├── test_health.py       # GET /health
+├── test_search.py       # GET /api/v1/search/destinations
+├── test_flights.py      # POST /api/v1/flights/price
+├── test_hotels.py       # POST /api/v1/hotels/search
+├── test_weather.py      # POST /api/v1/weather
+├── test_calendar.py     # POST /api/v1/calendar
+└── test_compare.py      # POST /api/v1/compare
+```
+
+### conftest.py — Shared Fixtures
+```python
+import pytest
+from fastapi.testclient import TestClient
+from app.main import app
+
+@pytest.fixture
+def client():
+    return TestClient(app)
+```
+
+### What to Test for Each Endpoint
+Derive test payloads from `docs/api-spec.yaml` example fields.
+
+**For each endpoint, write these test cases:**
+
+1. **Happy path (200)** — send the spec's example request, verify:
+   - Status code 200
+   - Response JSON matches the Pydantic model structure
+   - Key fields are present and have correct types
+
+2. **Validation error (422)** — send missing/invalid required fields, verify:
+   - Status code 422
+   - FastAPI validation error format returned
+
+3. **Error cases per spec** — for endpoints that define specific errors:
+   - `400 bad_request` — e.g., departure_date in the past (flights)
+   - `404 not_found` — e.g., no flights found for route
+   - `422 validation_error` — e.g., compare with <2 options
+
+### Example Test Pattern
+```python
+def test_search_destinations_happy(client):
+    resp = client.get(
+        "/api/v1/search/destinations",
+        params={"q": "London"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) > 0
+    assert "name" in data[0]
+    assert "iata_code" in data[0]
+
+def test_search_destinations_missing_q(client):
+    resp = client.get("/api/v1/search/destinations")
+    assert resp.status_code == 422
+
+def test_compare_min_options(client):
+    resp = client.post(
+        "/api/v1/compare",
+        json={"options": [single_option]},
+    )
+    assert resp.status_code == 422
+    assert resp.json()["error"] == "validation_error"
+```
+
+### Test Execution
+```bash
+docker compose run --rm backend pytest tests/ -v
+```
+If pytest is not installed in Docker, add it: `pip install pytest httpx`
+
+### Important Rules
+- Tests call **real external APIs** (integration tests) — this is intentional for a hackathon
+- Use the spec's example payloads as test data
+- Mark slow tests with `@pytest.mark.slow` if they take >5s
+- All tests must PASS before declaring completion
+
+---
+
 ## 9. Completion Checklist
 
 **You are NOT done until ALL of these are true:**
@@ -277,12 +375,14 @@ The spec is the source of truth for test data. Do NOT hardcode test payloads —
 - [ ] Phase 2 complete: All 6 endpoint files implemented
 - [ ] Phase 3 complete: All routers registered in main.py
 - [ ] Phase 4 complete: All verification curl commands return valid responses
+- [ ] Phase 5 complete: pytest tests written and passing for all endpoints
 - [ ] `docker compose up` runs without errors
 - [ ] All 6 v1 endpoints return 200 with valid data (matching schema). `/health` is already implemented.
 - [ ] Error cases return correct status codes per endpoint (see `docs/api-spec.yaml` for which endpoints define 400, 404, 422, 504)
 - [ ] No TODO, placeholder, or hardcoded mock data remains in the code
 - [ ] `backend/PROGRESS.md` is updated with final status for all phases
 - [ ] `http://localhost:8000/docs` shows all endpoints in Swagger UI
+- [ ] `pytest tests/ -v` all pass
 
 **Only after ALL checkboxes are true:**
 1. Merge your branch to main: `git checkout main && git merge feat/backend --no-edit && git push origin main`
