@@ -34,19 +34,21 @@ async def search_hotels(
     checkin_date: date,
     checkout_date: date,
     traveler_count: int = 1,
+    country_code: str = "",
 ) -> list[HotelOption]:
     """Search hotels and return top 5 by price."""
     occupancies = _build_occupancies(traveler_count)
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         # Step 1: Search hotels by location
-        search_params = {
-            "countryCode": "",
+        search_params: dict = {
             "cityName": destination,
             "latitude": latitude,
             "longitude": longitude,
             "limit": 20,
         }
+        if country_code:
+            search_params["countryCode"] = country_code
         logger.info(
             "LiteAPI hotel search: %s params=%s",
             f"{BASE_URL}/data/hotels",

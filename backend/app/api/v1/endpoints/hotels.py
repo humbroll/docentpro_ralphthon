@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.api.v1.schemas import HotelOption, HotelSearchRequest
+from app.services.amadeus_service import lookup_country_code
 from app.services.liteapi_service import search_hotels
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,9 @@ async def hotel_search(req: HotelSearchRequest):
             },
         )
 
+    country = lookup_country_code(req.destination)
+    logger.info("Resolved country code: %s → %s", req.destination, country or "(none)")
+
     try:
         results = await search_hotels(
             destination=req.destination,
@@ -54,6 +58,7 @@ async def hotel_search(req: HotelSearchRequest):
             checkin_date=req.checkin_date,
             checkout_date=req.checkout_date,
             traveler_count=req.traveler_count,
+            country_code=country,
         )
     except Exception as e:
         logger.error(
