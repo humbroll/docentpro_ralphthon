@@ -325,4 +325,4 @@ The spec is the source of truth for test data. Do NOT hardcode test payloads —
 13. **Always validate external API responses** — never trust that they match docs exactly
 14. **Log failed approaches** in PROGRESS.md so they are not repeated
 15. If something is fundamentally broken → **STOP and report**, do not silently skip
-16. **When ALL checklist items are true**, output `COMPLETE` as your final message. This signals the Ralph loop to stop.
+16. **When ALL checklist items are true**, output <promise>COMPELETED</promise> as your final message. This signals the Ralph loop to stop.

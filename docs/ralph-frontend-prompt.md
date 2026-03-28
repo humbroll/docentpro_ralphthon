@@ -265,4 +265,4 @@ const showComparison = options.length >= 2;
 9. **Import API types** from `@/types/api` — never redefine them
 10. **Read the spec file** for each component before implementing — the specs contain copy-ready JSX skeletons
 11. When done, run the **cross-reference checklist** (`docs/frontend/frontend-spec-cross-reference-checklist.md`)
-12. **When ALL checklist items are true**, output `COMPLETE` as your final message. This signals the Ralph loop to stop.
+12. **When ALL checklist items are true**, output <promise>COMPELETED</promise> as your final message. This signals the Ralph loop to stop.
