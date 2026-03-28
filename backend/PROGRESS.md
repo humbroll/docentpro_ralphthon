@@ -41,4 +41,61 @@
 
 ---
 
-**Next**: Phase 1 — Service Layer
+## Phase 1 — Service Layer — COMPLETED
+**Date**: 2026-03-28
+**Files created**:
+- services/amadeus_service.py (city search + flight price)
+- services/liteapi_service.py (hotel search + rates, with Haversine distance)
+- services/weather_service.py (Open-Meteo + scoring formulas)
+- services/scoring_service.py (compare logic, cost_score, overall_score, tags)
+
+**Decisions made**:
+- Amadeus SDK with hostname='test' and currencyCode='USD'
+- LiteAPI: 2-step flow (search → rates), occupancy split (ceil(travelers/2))
+- Haversine distance via geopy.distance.geodesic
+- Weather: fetch previous year's data, score per day then average
+
+---
+
+## Phase 2 — Endpoint Layer — COMPLETED
+**Date**: 2026-03-28
+**Files created**:
+- api/v1/endpoints/search.py
+- api/v1/endpoints/flights.py
+- api/v1/endpoints/hotels.py
+- api/v1/endpoints/weather.py
+- api/v1/endpoints/calendar.py
+- api/v1/endpoints/compare.py
+
+---
+
+## Phase 3 — Router Integration — COMPLETED
+**Date**: 2026-03-28
+**Files modified**:
+- app/main.py (added 6 router includes with /api/v1 prefix)
+
+---
+
+## Phase 4 — Self-Verification — COMPLETED
+**Date**: 2026-03-28
+
+### Endpoint Test Results
+| Endpoint | Status | Response |
+|----------|--------|----------|
+| GET /health | ✅ 200 | `{"status":"ok"}` |
+| GET /api/v1/search/destinations?q=London | ✅ 200 | 5 city results |
+| POST /api/v1/flights/price (ICN→NRT) | ✅ 200 | price: 125.40 USD |
+| POST /api/v1/hotels/search (Tokyo) | ✅ 200 | 5 hotels with prices |
+| POST /api/v1/weather (Tokyo) | ✅ 200 | weather_score: 75.8 |
+| POST /api/v1/calendar (Tokyo) | ✅ 200 | 10 days with labels |
+| POST /api/v1/compare (2 options) | ✅ 200 | scored + tagged |
+
+### Error Case Results
+| Test | Status | Response |
+|------|--------|----------|
+| Missing q param | 422 | FastAPI validation error |
+| 1 compare option | ✅ 422 | `{"error":"validation_error","message":"At least 2 options..."}` |
+
+---
+
+**All phases COMPLETED. Backend implementation is done.**
