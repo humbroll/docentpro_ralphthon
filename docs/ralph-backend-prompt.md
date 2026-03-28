@@ -284,7 +284,9 @@ The spec is the source of truth for test data. Do NOT hardcode test payloads —
 - [ ] `backend/PROGRESS.md` is updated with final status for all phases
 - [ ] `http://localhost:8000/docs` shows all endpoints in Swagger UI
 
-**Only after ALL checkboxes are true can you declare the implementation complete.**
+**Only after ALL checkboxes are true:**
+1. Merge your branch to main: `git checkout main && git merge feat/backend --no-edit && git push origin main`
+2. Output `COMPLETE` as your final message
 
 ---
 
@@ -323,3 +325,4 @@ The spec is the source of truth for test data. Do NOT hardcode test payloads —
 13. **Always validate external API responses** — never trust that they match docs exactly
 14. **Log failed approaches** in PROGRESS.md so they are not repeated
 15. If something is fundamentally broken → **STOP and report**, do not silently skip
+16. **When ALL checklist items are true**, output `COMPLETE` as your final message. This signals the Ralph loop to stop.
