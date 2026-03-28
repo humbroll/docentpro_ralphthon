@@ -3,7 +3,7 @@
 import logging
 from datetime import date
 
-from amadeus import Client, ResponseError
+from amadeus import Client
 
 from app.api.v1.schemas import DestinationResult, FlightPrice
 from app.core.config import settings
