@@ -1,5 +1,6 @@
 'use client';
 
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardHeader from '@mui/material/CardHeader';
 import CardContent from '@mui/material/CardContent';
@@ -11,6 +12,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Chip from '@mui/material/Chip';
 import HotelIcon from '@mui/icons-material/Hotel';
+import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined';
 import { InlineError } from '../shared/InlineError';
 import type { HotelOption } from '@/types/api';
 import type { LoadingState } from '@/types/frontend';
@@ -96,9 +98,15 @@ export function HotelSelectionCard({
         )}
 
         {state === 'success' && hotels && hotels.length === 0 && (
-          <Typography variant="body2" color="text.secondary">
-            No hotels found for the selected dates.
-          </Typography>
+          <Box sx={{ textAlign: 'center', py: 3 }}>
+            <ApartmentOutlinedIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary" fontWeight={500}>
+              No hotels available
+            </Typography>
+            <Typography variant="caption" color="text.disabled">
+              Try adjusting your dates or destination.
+            </Typography>
+          </Box>
         )}
 
         {state === 'idle' && (

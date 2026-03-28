@@ -1,17 +1,20 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import AddIcon from '@mui/icons-material/Add';
+import CheckIcon from '@mui/icons-material/Check';
 import { FlightPriceCard } from './FlightPriceCard';
 import { HotelSelectionCard } from './HotelSelectionCard';
 import { WeatherSummaryCard } from './WeatherSummaryCard';
 import { useComparisonQueue } from '@/context/ComparisonQueueContext';
 import type { HotelOption } from '@/types/api';
 import type { DateDetailResults, DateRange, SelectedDestination, ComparisonQueueItem } from '@/types/frontend';
+import dayjs from 'dayjs';
 
 interface DateOptionBuilderSectionProps {
   destination: SelectedDestination;
@@ -39,14 +42,24 @@ export function DateOptionBuilderSection({
   onRetryWeather,
 }: DateOptionBuilderSectionProps) {
   const { addItem, isFull, queue } = useComparisonQueue();
+  const [justAdded, setJustAdded] = useState(false);
+  const addedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const canAdd =
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+    };
+  }, []);
+
+  const allLoaded =
     results.flight.state === 'success' &&
     results.flight.data &&
     results.weather.state === 'success' &&
     results.weather.data &&
-    selectedHotel &&
-    originAirport.length === 3;
+    selectedHotel;
+
+  const canAdd = allLoaded && originAirport.length === 3;
 
   const queueItemId = `${destination.name}-${dateRange.startDate}-${dateRange.endDate}`;
   const isDuplicate = queue.some((item) => item.id === queueItemId);
@@ -67,15 +80,25 @@ export function DateOptionBuilderSection({
       travelerCount,
     };
 
-    addItem(item);
+    const added = addItem(item);
+    if (added) {
+      setJustAdded(true);
+      if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+      addedTimerRef.current = setTimeout(() => setJustAdded(false), 1500);
+    }
   };
 
   const getTooltip = (): string => {
+    if (justAdded) return 'Added!';
     if (isFull) return 'Queue is full (max 5 items)';
     if (isDuplicate) return 'This date option is already in the queue';
-    if (!canAdd) return 'Complete all fields to add to queue';
+    if (!allLoaded) return 'Wait for all data to load';
+    if (originAirport.length !== 3) return 'Enter a 3-letter origin airport code';
     return '';
   };
+
+  const formattedStart = dayjs(dateRange.startDate).format('MMM D');
+  const formattedEnd = dayjs(dateRange.endDate).format('MMM D, YYYY');
 
   return (
     <Box sx={{ mb: 6 }}>
@@ -84,7 +107,7 @@ export function DateOptionBuilderSection({
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Review flight, hotel, and weather options for {destination.name},{' '}
-        {dateRange.startDate} to {dateRange.endDate}.
+        {formattedStart} &ndash; {formattedEnd}.
       </Typography>
 
       <Grid container spacing={3}>
@@ -120,16 +143,17 @@ export function DateOptionBuilderSection({
       </Grid>
 
       <Box sx={{ mt: 3, textAlign: 'right' }}>
-        <Tooltip title={getTooltip()} arrow>
+        <Tooltip title={getTooltip()} arrow open={justAdded || undefined}>
           <span>
             <Button
               variant="contained"
               size="large"
-              startIcon={<AddIcon />}
+              color={justAdded ? 'success' : 'primary'}
+              startIcon={justAdded ? <CheckIcon /> : <AddIcon />}
               onClick={handleAddToQueue}
-              disabled={!canAdd || isFull || isDuplicate}
+              disabled={!canAdd || isFull || isDuplicate || justAdded}
             >
-              Add to Queue {isFull ? '(Full)' : isDuplicate ? '(Added)' : ''}
+              {justAdded ? 'Added!' : isDuplicate ? 'Already in Queue' : isFull ? 'Queue Full' : 'Add to Queue'}
             </Button>
           </span>
         </Tooltip>

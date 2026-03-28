@@ -29,19 +29,59 @@ export function CalendarDayCell({
   onHover,
   disabled,
 }: CalendarDayCellProps) {
-  const bgColor = weather?.weather_label
-    ? `${WEATHER_LABEL_COLORS[weather.weather_label]}20`
-    : 'transparent';
+  const isEndpoint = isStart || isEnd;
+  const weatherColor = weather?.weather_label
+    ? WEATHER_LABEL_COLORS[weather.weather_label]
+    : null;
 
-  const borderColor = isStart || isEnd
+  // Background: endpoint = primary.main, in-range = primary.light alpha,
+  // hovered = weather color alpha or action.hover, else weather alpha
+  const bgColor = isEndpoint
     ? 'primary.main'
-    : isInRange || isHovered
+    : isInRange
+      ? 'rgba(25, 118, 210, 0.12)'
+      : isHovered && weatherColor
+        ? `${weatherColor}4D` // ~30% alpha
+        : isHovered
+          ? 'action.hover'
+          : weatherColor
+            ? `${weatherColor}26` // ~15% alpha
+            : 'transparent';
+
+  const borderColor = isEndpoint
+    ? 'primary.main'
+    : isInRange
       ? 'primary.light'
-      : 'divider';
+      : isHovered
+        ? 'primary.light'
+        : 'divider';
+
+  // Text color overrides for selected endpoint cells
+  const textColor = isEndpoint ? 'primary.contrastText' : 'text.primary';
+  const secondaryTextColor = isEndpoint ? 'primary.contrastText' : 'text.secondary';
+  const rainColor = isEndpoint ? 'primary.contrastText' : 'info.main';
+  const labelColor = isEndpoint
+    ? 'primary.contrastText'
+    : weatherColor ?? 'text.secondary';
+
+  // Accessibility label
+  const ariaLabel = weather
+    ? `${date.format('MMMM D, YYYY')}, ${weather.weather_label ?? 'No'} weather, high ${Math.round(weather.temp_high ?? 0)}°C, rainfall ${(weather.rain_mm ?? 0).toFixed(1)}mm`
+    : date.format('MMMM D, YYYY');
 
   return (
     <Box
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-label={ariaLabel}
+      aria-disabled={disabled}
       onClick={() => !disabled && onClick(date)}
+      onKeyDown={(e) => {
+        if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onClick(date);
+        }
+      }}
       onMouseEnter={() => !disabled && onHover(date)}
       onMouseLeave={() => onHover(null)}
       sx={{
@@ -50,27 +90,36 @@ export function CalendarDayCell({
         border: 1,
         borderColor,
         borderRadius: 1,
-        backgroundColor: isInRange || isHovered ? 'action.hover' : bgColor,
+        backgroundColor: bgColor,
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.4 : 1,
-        '&:hover': disabled ? {} : { backgroundColor: 'action.hover' },
+        transition: 'background-color 150ms ease, border-color 150ms ease',
+        '&:hover': disabled
+          ? {}
+          : {
+              backgroundColor: isEndpoint
+                ? 'primary.dark'
+                : weatherColor
+                  ? `${weatherColor}4D`
+                  : 'action.hover',
+            },
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
       }}
     >
-      <Typography variant="caption" fontWeight={600} lineHeight={1.2}>
+      <Typography variant="caption" fontWeight={600} lineHeight={1.2} color={textColor}>
         {date.date()}
       </Typography>
 
       {weather?.temp_high != null && weather?.temp_low != null && (
-        <Typography variant="caption" sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}>
+        <Typography variant="caption" sx={{ fontSize: '0.65rem', lineHeight: 1.3, color: secondaryTextColor }}>
           {Math.round(weather.temp_high)}° / {Math.round(weather.temp_low)}°
         </Typography>
       )}
 
       {weather?.rain_mm != null && weather.rain_mm > 0 && (
-        <Typography variant="caption" sx={{ fontSize: '0.6rem', lineHeight: 1.3, color: 'info.main' }}>
+        <Typography variant="caption" sx={{ fontSize: '0.6rem', lineHeight: 1.3, color: rainColor }}>
           {'💧'} {weather.rain_mm.toFixed(1)}mm
         </Typography>
       )}
@@ -82,7 +131,7 @@ export function CalendarDayCell({
           sx={{
             fontSize: '0.6rem',
             lineHeight: 1.3,
-            color: WEATHER_LABEL_COLORS[weather.weather_label],
+            color: labelColor,
           }}
         >
           {weather.weather_label}

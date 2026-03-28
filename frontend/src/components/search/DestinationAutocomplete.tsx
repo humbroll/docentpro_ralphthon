@@ -85,10 +85,11 @@ export function DestinationAutocomplete({ value, onChange, error }: DestinationA
       renderInput={(params) => (
         <TextField
           {...params}
+          id="destination-search-input"
           label="Destination"
           placeholder="e.g. Tokyo, Paris, New York"
           error={!!fetchError || !!error}
-          helperText={fetchError || error || ' '}
+          helperText={fetchError || error || (inputValue.length === 0 ? 'Type at least 3 characters to search' : ' ')}
           slotProps={{
             input: {
               ...params.InputProps,

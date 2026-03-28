@@ -8,6 +8,7 @@ import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
 import WbSunnyIcon from '@mui/icons-material/WbSunny';
+import CloudOffOutlinedIcon from '@mui/icons-material/CloudOffOutlined';
 import { InlineError } from '../shared/InlineError';
 import type { WeatherSummary } from '@/types/api';
 import type { LoadingState } from '@/types/frontend';
@@ -48,11 +49,11 @@ export function WeatherSummaryCard({
 
         {state === 'success' && weather && (
           <Stack spacing={1.5}>
-            <Stack direction="row" alignItems="center" spacing={1}>
+            <Stack direction="row" alignItems="baseline" spacing={0.5}>
               <Typography variant="h4" fontWeight={700}>
-                {weather.weather_score.toFixed(1)}
+                {weather.weather_score.toFixed(0)}
               </Typography>
-              <Typography variant="body2" color="text.secondary">/ 100</Typography>
+              <Typography variant="body2" color="text.secondary">/100</Typography>
             </Stack>
 
             <Chip

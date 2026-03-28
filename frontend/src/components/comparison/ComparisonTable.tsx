@@ -19,17 +19,7 @@ interface ComparisonTableProps {
   bestIndex: number;
 }
 
-const TAG_COLORS: Record<string, 'success' | 'info' | 'warning'> = {
-  cheapest: 'success',
-  best_weather: 'info',
-  best_overall: 'warning',
-};
-
-const TAG_LABELS: Record<string, string> = {
-  cheapest: 'Cheapest',
-  best_weather: 'Best Weather',
-  best_overall: 'Best Overall',
-};
+import { TAG_COLORS, TAG_LABELS } from '@/types/constants';
 
 export function ComparisonTable({ options, bestIndex }: ComparisonTableProps) {
   return (
@@ -44,8 +34,7 @@ export function ComparisonTable({ options, bestIndex }: ComparisonTableProps) {
                 align="center"
                 sx={{
                   fontWeight: 600,
-                  backgroundColor: i === bestIndex ? 'success.light' : undefined,
-                  color: i === bestIndex ? 'success.contrastText' : undefined,
+                  backgroundColor: i === bestIndex ? 'rgba(76, 175, 80, 0.1)' : undefined,
                 }}
               >
                 {opt.destination}
