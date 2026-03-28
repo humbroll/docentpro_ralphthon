@@ -1,66 +1,228 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
 
-export default function Home() {
+import { useState, useEffect, useCallback } from 'react';
+import Container from '@mui/material/Container';
+import Box from '@mui/material/Box';
+import { SearchSection } from '@/components/search/SearchSection';
+import { CalendarSection } from '@/components/calendar/CalendarSection';
+import { DateOptionBuilderSection } from '@/components/dateOption/DateOptionBuilderSection';
+import { ComparisonSection } from '@/components/comparison/ComparisonSection';
+import { SectionContainer } from '@/components/layout/SectionContainer';
+import { useComparisonQueue } from '@/context/ComparisonQueueContext';
+import { getFlightPrice, searchHotels, getWeather, extractApiError } from '@/lib/api';
+import type { DestinationResult, HotelOption } from '@/types/api';
+import type {
+  SelectedDestination,
+  DateRange,
+  DateDetailResults,
+} from '@/types/frontend';
+
+const INITIAL_DETAIL_RESULTS: DateDetailResults = {
+  flight: { state: 'idle', data: null, error: null },
+  hotels: { state: 'idle', data: null, error: null },
+  weather: { state: 'idle', data: null, error: null },
+};
+
+export default function HomePage() {
+  // ── Search params ──
+  const [selectedDestination, setSelectedDestination] = useState<SelectedDestination | null>(null);
+  const [originAirport, setOriginAirport] = useState('');
+  const [travelerCount, setTravelerCount] = useState(1);
+
+  // ── Date selection ──
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+
+  // ── Date detail results ──
+  const [dateDetailResults, setDateDetailResults] = useState<DateDetailResults>(INITIAL_DETAIL_RESULTS);
+  const [selectedHotel, setSelectedHotel] = useState<HotelOption | null>(null);
+
+  // ── Queue count for progressive reveal ──
+  const { count: queueCount } = useComparisonQueue();
+
+  // ── Derived visibility ──
+  const showCalendar = selectedDestination !== null;
+  const showDateDetails = dateRange !== null;
+  const showComparison = queueCount >= 1;
+
+  // ── Handlers ──
+  const handleDestinationChange = (dest: DestinationResult | null) => {
+    if (dest) {
+      setSelectedDestination({
+        name: dest.name,
+        latitude: dest.latitude,
+        longitude: dest.longitude,
+        country: dest.country,
+        iata_code: dest.iata_code,
+      });
+    } else {
+      setSelectedDestination(null);
+    }
+    // Cascading reset
+    setDateRange(null);
+    setDateDetailResults(INITIAL_DETAIL_RESULTS);
+    setSelectedHotel(null);
+  };
+
+  const handleDateRangeConfirm = (range: DateRange) => {
+    setDateRange(range);
+    setDateDetailResults(INITIAL_DETAIL_RESULTS);
+    setSelectedHotel(null);
+  };
+
+  // ── Fetch date details ──
+  const fetchFlightPrice = useCallback(async () => {
+    if (!selectedDestination || !dateRange || !selectedDestination.iata_code || originAirport.length !== 3) {
+      return;
+    }
+    setDateDetailResults((prev) => ({
+      ...prev,
+      flight: { state: 'loading', data: null, error: null },
+    }));
+    try {
+      const result = await getFlightPrice({
+        origin: originAirport,
+        destination: selectedDestination.iata_code,
+        departure_date: dateRange.startDate,
+        return_date: dateRange.endDate,
+        traveler_count: travelerCount,
+      });
+      setDateDetailResults((prev) => ({
+        ...prev,
+        flight: { state: 'success', data: result, error: null },
+      }));
+    } catch (err) {
+      const apiErr = extractApiError(err);
+      setDateDetailResults((prev) => ({
+        ...prev,
+        flight: { state: 'error', data: null, error: apiErr.message },
+      }));
+    }
+  }, [selectedDestination, dateRange, originAirport, travelerCount]);
+
+  const fetchHotels = useCallback(async () => {
+    if (!selectedDestination || !dateRange) return;
+    setDateDetailResults((prev) => ({
+      ...prev,
+      hotels: { state: 'loading', data: null, error: null },
+    }));
+    try {
+      const result = await searchHotels({
+        destination: selectedDestination.name,
+        latitude: selectedDestination.latitude,
+        longitude: selectedDestination.longitude,
+        checkin_date: dateRange.startDate,
+        checkout_date: dateRange.endDate,
+        traveler_count: travelerCount,
+      });
+      setDateDetailResults((prev) => ({
+        ...prev,
+        hotels: { state: 'success', data: result, error: null },
+      }));
+      // Auto-select cheapest hotel
+      if (result.length > 0) {
+        setSelectedHotel(result[0]);
+      }
+    } catch (err) {
+      const apiErr = extractApiError(err);
+      setDateDetailResults((prev) => ({
+        ...prev,
+        hotels: { state: 'error', data: null, error: apiErr.message },
+      }));
+    }
+  }, [selectedDestination, dateRange, travelerCount]);
+
+  const fetchWeather = useCallback(async () => {
+    if (!selectedDestination || !dateRange) return;
+    setDateDetailResults((prev) => ({
+      ...prev,
+      weather: { state: 'loading', data: null, error: null },
+    }));
+    try {
+      const result = await getWeather({
+        latitude: selectedDestination.latitude,
+        longitude: selectedDestination.longitude,
+        start_date: dateRange.startDate,
+        end_date: dateRange.endDate,
+      });
+      setDateDetailResults((prev) => ({
+        ...prev,
+        weather: { state: 'success', data: result, error: null },
+      }));
+    } catch (err) {
+      const apiErr = extractApiError(err);
+      setDateDetailResults((prev) => ({
+        ...prev,
+        weather: { state: 'error', data: null, error: apiErr.message },
+      }));
+    }
+  }, [selectedDestination, dateRange]);
+
+  // Auto-fetch when dateRange changes
+  useEffect(() => {
+    if (dateRange && selectedDestination) {
+      fetchFlightPrice();
+      fetchHotels();
+      fetchWeather();
+    }
+  }, [dateRange, selectedDestination, fetchFlightPrice, fetchHotels, fetchWeather]);
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <Box component="main">
+      <Container maxWidth="lg">
+        {/* Section 1: Search (always visible) */}
+        <SearchSection
+          selectedDestination={
+            selectedDestination
+              ? {
+                  name: selectedDestination.name,
+                  latitude: selectedDestination.latitude,
+                  longitude: selectedDestination.longitude,
+                  country: selectedDestination.country,
+                  iata_code: selectedDestination.iata_code,
+                }
+              : null
+          }
+          onDestinationChange={handleDestinationChange}
+          originAirport={originAirport}
+          onOriginAirportChange={setOriginAirport}
+          travelerCount={travelerCount}
+          onTravelerCountChange={setTravelerCount}
         />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Section 2: Calendar (after destination selected) */}
+        <SectionContainer visible={showCalendar}>
+          {selectedDestination && (
+            <CalendarSection
+              destination={selectedDestination}
+              onDateRangeConfirm={handleDateRangeConfirm}
+              confirmedDateRange={dateRange}
             />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+          )}
+        </SectionContainer>
+
+        {/* Section 3: Date Details (after date range confirmed) */}
+        <SectionContainer visible={showDateDetails}>
+          {selectedDestination && dateRange && (
+            <DateOptionBuilderSection
+              destination={selectedDestination}
+              dateRange={dateRange}
+              results={dateDetailResults}
+              originAirport={originAirport}
+              travelerCount={travelerCount}
+              selectedHotel={selectedHotel}
+              onSelectHotel={setSelectedHotel}
+              onRetryFlight={fetchFlightPrice}
+              onRetryHotels={fetchHotels}
+              onRetryWeather={fetchWeather}
+            />
+          )}
+        </SectionContainer>
+
+        {/* Section 4: Comparison (after ≥1 queue items) */}
+        <SectionContainer visible={showComparison}>
+          <ComparisonSection />
+        </SectionContainer>
+      </Container>
+    </Box>
   );
 }
