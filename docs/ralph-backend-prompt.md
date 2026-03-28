@@ -136,6 +136,7 @@ from amadeus import Client, ResponseError
 amadeus = Client(
     client_id=settings.AMADEUS_API_KEY,
     client_secret=settings.AMADEUS_API_SECRET,
+    hostname='test',  # REQUIRED — using Amadeus test environment
 )
 # City Search:
 amadeus.reference_data.locations.get(keyword=query, subType=["CITY"])
