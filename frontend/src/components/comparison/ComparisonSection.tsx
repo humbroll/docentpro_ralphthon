@@ -31,7 +31,7 @@ export function ComparisonSection() {
   const canCompare = count >= MIN_COMPARE_SIZE;
 
   return (
-    <Box sx={{ mb: 6 }}>
+    <Box id="comparison-section" sx={{ mb: 6 }}>
       <Typography variant="h5" component="h2" fontWeight={600} gutterBottom>
         Compare Options
       </Typography>

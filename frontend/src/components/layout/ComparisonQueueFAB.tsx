@@ -11,10 +11,18 @@ export default function ComparisonQueueFAB() {
 
   if (count === 0) return null;
 
+  const handleClick = () => {
+    const el = document.getElementById('comparison-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
     <Fab
       color="primary"
       aria-label={`${count} item${count !== 1 ? 's' : ''} in comparison queue`}
+      onClick={handleClick}
       sx={{ position: 'fixed', bottom: 24, right: 24 }}
     >
       <Badge

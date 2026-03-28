@@ -2,34 +2,47 @@
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
 
 interface EmptyStateProps {
-  title: string;
-  description?: string;
   icon?: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
-export function EmptyState({ title, description, icon }: EmptyStateProps) {
+export function EmptyState({ icon, title, subtitle, action }: EmptyStateProps) {
   return (
     <Box
       sx={{
-        textAlign: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 1.5,
         py: 6,
         px: 2,
       }}
     >
       {icon && (
-        <Box sx={{ mb: 2, color: 'text.secondary', fontSize: 48 }}>
+        <Box sx={{ fontSize: 48, color: 'text.disabled' }}>
           {icon}
         </Box>
       )}
-      <Typography variant="h6" color="text.secondary" gutterBottom>
+      <Typography variant="h6" color="text.secondary" textAlign="center">
         {title}
       </Typography>
-      {description && (
-        <Typography variant="body2" color="text.secondary">
-          {description}
+      {subtitle && (
+        <Typography variant="body2" color="text.disabled" textAlign="center">
+          {subtitle}
         </Typography>
+      )}
+      {action && (
+        <Button variant="text" color="primary" size="medium" onClick={action.onClick}>
+          {action.label}
+        </Button>
       )}
     </Box>
   );
