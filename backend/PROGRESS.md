@@ -12,7 +12,14 @@
   - `geoCode`: `{"latitude": float, "longitude": float}`
   - `address.countryCode`: 2-letter ISO code (e.g., "FR")
   - `subType`: "CITY" or "AIRPORT"
-  - Note: `keyword='Tokyo'` returns 0 results in test env; `keyword='Paris'` works. Test environment has limited data.
+  - Note: `keyword='Tokyo'` and `keyword='Seoul'` return 0 results in test env; `keyword='Paris'` and `keyword='London'` work. Test environment has limited city data.
+- **Flight Search Response** (`shopping.flight_offers_search.get`):
+  - `resp.data` = list of flight offer objects
+  - Price extraction: `resp.data[0]["price"]["total"]` (string, e.g., "108.66")
+  - Currency: `resp.data[0]["price"]["currency"]` (returns "EUR" in test env, NOT "USD")
+  - Price keys: `currency`, `total`, `base`, `fees`, `grandTotal`
+  - `grandTotal` includes fees; use `grandTotal` for the final price
+  - **IMPORTANT**: Test env returns EUR. Use `currencyCode='USD'` param or convert. If Amadeus doesn't support currency param in test env, just return the price as-is with actual currency.
 
 ### LiteAPI (Hotel Search + Rates)
 - **Search** (`GET /v3.0/data/hotels`): Status 200 OK
