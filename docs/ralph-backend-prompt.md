@@ -165,6 +165,13 @@ amadeus.shopping.flight_offers_search.get(
 # CRITICAL: fetch PREVIOUS YEAR's data for the requested dates
 ```
 
+### Service Responsibility
+
+- `amadeus_service.py` — Amadeus SDK calls (city search, flight offers). Maps raw responses to Pydantic models.
+- `liteapi_service.py` — LiteAPI HTTP calls (hotel search + min-rates). Maps raw responses to Pydantic models.
+- `weather_service.py` — Open-Meteo HTTP calls. Calculates `weather_score`, `rain_signal`, `label`, and `description` per day. All formulas are in `docs/api-spec.yaml` under `info.description`.
+- `scoring_service.py` — Compare-only logic: `cost_score`, `overall_score`, tag assignment. Does NOT call external APIs.
+
 ### Assumption Verification Protocol
 
 **Before implementing each service**, call the real API once with test data. If the actual response structure differs from what you expected:
@@ -263,8 +270,8 @@ The spec is the source of truth for test data. Do NOT hardcode test payloads —
 - [ ] Phase 3 complete: All routers registered in main.py
 - [ ] Phase 4 complete: All verification curl commands return valid responses
 - [ ] `docker compose up` runs without errors
-- [ ] All 6 endpoints return 200 with valid data (matching schema)
-- [ ] All 3 error cases (400, 404, 422) return correct status codes and `{"error", "message"}` format
+- [ ] All 6 v1 endpoints return 200 with valid data (matching schema). `/health` is already implemented.
+- [ ] Error cases return correct status codes per endpoint (see `docs/api-spec.yaml` for which endpoints define 400, 404, 422, 504)
 - [ ] No TODO, placeholder, or hardcoded mock data remains in the code
 - [ ] `backend/PROGRESS.md` is updated with final status for all phases
 - [ ] `http://localhost:8000/docs` shows all endpoints in Swagger UI
