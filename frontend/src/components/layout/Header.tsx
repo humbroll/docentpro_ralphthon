@@ -22,7 +22,7 @@ export default function Header() {
           >
             WhenToGo
           </Typography>
-          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ opacity: 0.8 }}>
+          <a href="https://docentpro.com" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: 0.8, textDecoration: 'none', color: 'inherit' }}>
             <Typography variant="caption" sx={{ color: 'inherit', fontSize: '0.7rem' }}>
               by
             </Typography>
@@ -31,7 +31,7 @@ export default function Header() {
               alt="DocentPro"
               style={{ height: 24, objectFit: 'contain' }}
             />
-          </Stack>
+          </a>
         </Stack>
 
         {count > 0 && (
