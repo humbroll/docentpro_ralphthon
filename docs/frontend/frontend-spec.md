@@ -1546,7 +1546,7 @@ The root page component that orchestrates all progressive sections. This is wher
  *
  * Section visibility rules:
  *   - "destination": ALWAYS visible
- *   - "calendar": visible when searchParams.destination !== null
+ *   - "calendar": ALWAYS visible (weather data fetched after destination selected)
  *   - "dateDetails": visible when dateRange !== null
  *   - "comparison": visible when comparison queue count >= 1
  *
@@ -1569,10 +1569,10 @@ export default function HomePage(): JSX.Element;
     />
   </SectionContainer>
 
-  {/* Section 2: Visible after destination selected */}
+  {/* Section 2: Always visible */}
   <SectionContainer
     sectionId="calendar"
-    visible={searchParams.destination !== null}
+    visible={true}
     title="Select Your Dates"
     subtitle="Choose a date range to explore. Weather data is based on last year's historical records."
   >

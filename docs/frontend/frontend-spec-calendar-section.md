@@ -6,7 +6,7 @@
 
 ## 1. Section Overview
 
-The **Calendar / Date Selection section** is the second section on the root route (`/`). It is **hidden** on page load and becomes visible when the user selects a destination in the Search section above (i.e., `selectedDestination !== null`).
+The **Calendar / Date Selection section** is the second section on the root route (`/`). It is **always visible** on page load, displayed alongside the Search section. Before a destination is selected, it shows an empty calendar grid without weather data. Once a destination is selected, weather data is fetched and overlaid on the calendar days.
 
 Its purpose is to:
 
@@ -25,7 +25,7 @@ The calendar fetches weather data for a 2-month window starting from the current
 <Container maxWidth="lg">
   <SearchSection />                           // always visible
   ─── 48px gap (mb: 6) ───
-  <CalendarSection visible={!!selectedDestination} />   ◄── THIS SPEC
+  <CalendarSection visible={true} />   ◄── THIS SPEC (always visible)
   ─── 48px gap (mb: 6) ───
   <DateOptionBuilderSection />                // revealed after date range confirmed
   ...

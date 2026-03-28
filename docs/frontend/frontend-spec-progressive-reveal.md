@@ -63,7 +63,7 @@ The progressive reveal is controlled by **four state variables**, three of which
 | # | Variable             | Type                            | Declared In         | Initial Value                                                  | What It Tracks                                     |
 |---|----------------------|---------------------------------|---------------------|----------------------------------------------------------------|----------------------------------------------------|
 | 1 | `searchParams`       | `SearchParams`                  | `HomePage` state    | `{ destination: null, originAirport: '', travelerCount: 1 }`   | User's selected destination, origin airport, traveler count |
-| 2 | `calendarWeather`    | `CalendarWeatherState`          | `HomePage` state    | `{ state: 'idle', data: null, error: null }`                   | Calendar weather overlay data (fetched after destination selected) |
+| 2 | `calendarWeather`    | `CalendarWeatherState`          | `HomePage` state    | `{ state: 'idle', data: null, error: null }`                   | Calendar weather overlay data (calendar always visible; weather fetched when destination selected) |
 | 3 | `dateRange`          | `DateRange \| null`             | `HomePage` state    | `null`                                                         | User's selected start/end dates from the calendar  |
 | 4 | `dateDetailResults`  | `DateDetailResults`             | `HomePage` state    | `{ flight: {...idle}, hotels: {...idle}, weather: {...idle} }`  | Flight price, hotel list, weather data for selected dates |
 | 5 | `queueCount`         | `number`                        | `ComparisonQueueContext` | `0` (derived from `queue.length`)                         | Number of items in the comparison queue             |
@@ -73,7 +73,7 @@ The progressive reveal is controlled by **four state variables**, three of which
 | Section         | Visibility Expression                     |
 |-----------------|-------------------------------------------|
 | `"destination"` | `true` (always visible)                   |
-| `"calendar"`    | `searchParams.destination !== null`        |
+| `"calendar"`    | `true` (always visible)                    |
 | `"dateDetails"` | `dateRange !== null`                       |
 | `"comparison"`  | `queueCount >= 1`                          |
 
@@ -93,11 +93,11 @@ The progressive reveal is controlled by **four state variables**, three of which
 
 ### 4.2 Section 2: Calendar (`"calendar"`)
 
-**Visible when**: `searchParams.destination !== null`
+**Visible when**: Always. The calendar section is rendered with `visible={true}` unconditionally.
 
-**Becomes visible**: Immediately after the user selects a destination from the autocomplete. The `handleDestinationChange` callback in `HomePage` sets `searchParams.destination` to the selected `SelectedDestination` object.
+**Becomes visible**: Immediately on page load, alongside the Search section.
 
-**Becomes hidden**: If the user clears the destination search input (which sets `searchParams.destination` back to `null`). This hides the calendar and all downstream sections.
+**Becomes hidden**: Never. The calendar section remains visible throughout the entire page lifecycle. Before a destination is selected, it shows an empty calendar grid (no weather data). After a destination is selected, weather data is fetched and overlaid on the calendar days.
 
 **Data dependency**: The `CalendarSection` component requires:
 - `destination: SelectedDestination` — the selected destination (for display and API call)

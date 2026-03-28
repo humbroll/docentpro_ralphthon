@@ -147,8 +147,8 @@ One route (`/`). Sections unlock as the user completes each step:
 
 ```
 SearchSection → CalendarSection → DateOptionBuilderSection → ComparisonSection
-  (always)        (after dest       (after date range         (after ≥2 items
-                   selected)         selected)                 in queue)
+  (always)        (always)           (after date range         (after ≥2 items
+                                      selected)                 in queue)
 ```
 
 → Full state machine and visibility rules: **`docs/frontend/frontend-spec-progressive-reveal.md`**

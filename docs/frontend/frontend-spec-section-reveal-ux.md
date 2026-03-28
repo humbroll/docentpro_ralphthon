@@ -81,7 +81,7 @@ When a new section reveals, the page should scroll to bring the newly revealed s
 
 | Trigger Event | Scroll Target | Scroll Behavior | Scroll Timing |
 |---------------|---------------|-----------------|---------------|
-| Destination selected → Calendar reveals | Top of `#calendar` section | `smooth` | After state update, in a `useEffect` that watches `searchParams.destination` transitioning from `null` to non-null |
+| Calendar is always visible (no reveal trigger) | N/A | N/A | Calendar renders on page load; no scroll trigger needed |
 | Date range selected → Date Details reveals | Top of `#dateDetails` section | `smooth` | After state update, in a `useEffect` that watches `dateRange` transitioning from `null` to non-null |
 | First item added to queue → Comparison reveals | Top of `#comparison` section | `smooth` | After queue count transitions from `0` to `1` (only on first item; subsequent additions do not scroll) |
 | User clicks ComparisonQueueFAB | Top of `#comparison` section | `smooth` | Immediately on click |
@@ -119,15 +119,16 @@ function scrollToSection(sectionId: SectionId): void {
 **Do NOT scroll when a section is already visible and merely re-fetching data.** Scroll only happens when a section transitions from invisible to visible. Implementation: track the previous visibility state with a `useRef` and only call `scrollToSection` when the previous value was `false` and the current value is `true`.
 
 ```typescript
-// Example: scroll to calendar when it first appears
-const prevShowCalendar = useRef(false);
+// Example: scroll to dateDetails when it first appears
+// (Calendar is always visible — no scroll needed for it)
+const prevShowDateDetails = useRef(false);
 
 useEffect(() => {
-  if (showCalendar && !prevShowCalendar.current) {
-    scrollToSection('calendar');
+  if (showDateDetails && !prevShowDateDetails.current) {
+    scrollToSection('dateDetails');
   }
-  prevShowCalendar.current = showCalendar;
-}, [showCalendar]);
+  prevShowDateDetails.current = showDateDetails;
+}, [showDateDetails]);
 ```
 
 ### 3.4 Scroll Offset
@@ -155,23 +156,22 @@ This section documents the exact visual experience for each section transition f
 - The `SearchSection` has a fixed layout that does not change between states.
 - No skeleton needed — the inputs render immediately with their default empty values.
 
-### 4.2 Section 2: Calendar — Destination Selected
+### 4.2 Section 2: Calendar — Always Visible
 
-**Trigger**: User selects a destination from the autocomplete dropdown.
+**Trigger**: Page load (no user action required).
 
 **What the user sees (frame by frame)**:
 
 | Frame | Timing | Visual |
 |-------|--------|--------|
-| 1 | Immediate (0ms) | Autocomplete dropdown closes. Selected destination name appears in the input field. |
-| 2 | Next render (~16ms) | Calendar section begins fading in (opacity starts at 0). The section contains a **calendar skeleton** (see §5.1). |
-| 3 | 0–500ms | Calendar section opacity increases from 0 to 1 (smooth fade). Skeleton is visible and static (no pulsing — MUI Skeleton has `animation="pulse"` by default, which is fine). |
-| 4 | ~500ms | Fade-in complete. Calendar section is fully opaque. Skeleton is still showing (API call is in-flight). |
-| 5 | Variable (API response) | Skeleton is replaced by the actual calendar grid with weather overlay (success) OR by an `InlineError` (error). This transition is **instant** (no animation between skeleton and content). |
+| 1 | Immediate (0ms) | Page loads with both the Search section and Calendar section visible. |
+| 2 | Next render (~16ms) | Calendar section shows a 2-month grid without weather data (empty day cells with dates only, no temperature/rain indicators). |
+| 3 | User selects destination | Weather API call fires. Calendar day cells show loading skeleton overlays. |
+| 4 | Variable (API response) | Skeleton overlays replaced by actual weather data (temp, rain, color-coded labels) OR by an `InlineError` (error). This transition is **instant**. |
 
-**Scroll behavior**: Page smoothly scrolls so the top of `#calendar` aligns with the top of the viewport.
+**Scroll behavior**: No scroll occurs on page load since the calendar is already visible.
 
-**Interaction during transition**: The Search section above remains fully interactive. The user can type a new destination while the calendar is loading — this cancels the in-flight calendar request and restarts the flow.
+**Interaction during transition**: The Search section above remains fully interactive. The calendar displays an empty grid (dates only, no weather) until a destination is selected. Once a destination is selected, weather data is fetched and overlaid automatically.
 
 ### 4.3 Section 3: Date Details — Date Range Selected
 
