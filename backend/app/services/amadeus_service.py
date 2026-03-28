@@ -78,6 +78,14 @@ def search_flights(
 ) -> FlightPrice | None:
     """Get lowest round-trip economy flight price."""
     client = _get_client()
+    logger.info(
+        "Amadeus flight search: %s→%s %s-%s pax=%d",
+        origin,
+        destination,
+        departure_date,
+        return_date,
+        traveler_count,
+    )
     resp = client.shopping.flight_offers_search.get(
         originLocationCode=origin,
         destinationLocationCode=destination,

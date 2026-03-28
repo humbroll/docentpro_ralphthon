@@ -48,12 +48,30 @@ async def get_flight_price(req: FlightPriceRequest):
             return_date=req.return_date,
             traveler_count=req.traveler_count,
         )
-    except ResponseError:
+    except ResponseError as e:
+        status = getattr(
+            getattr(e, "response", None),
+            "status_code",
+            500,
+        )
+        if status == 404 or "LOCATION" in str(e):
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error": "not_found",
+                    "message": (
+                        f"No flights found for"
+                        f" {req.origin} →"
+                        f" {req.destination}"
+                        f" on {req.departure_date}"
+                    ),
+                },
+            )
         return JSONResponse(
             status_code=500,
             content={
                 "error": "internal_error",
-                "message": "Amadeus API error",
+                "message": f"Amadeus API error: {e}",
             },
         )
     except Exception as e:
