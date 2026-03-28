@@ -138,10 +138,10 @@ All endpoints are defined in `docs/api-spec.yaml`. Here is a summary with implem
 - For IATA code: use the `iataCode` field from Amadeus response
 - For lat/lng: use `geoCode.latitude` and `geoCode.longitude` from Amadeus
 - Return max **10** results
-- Validate: `q` must be at least 2 characters, otherwise return 400
+- Validate: `q` must be at least 3 characters, otherwise return 400
 
 **Error Cases**:
-- `q` missing or < 2 chars → 400 `{"error": "bad_request", "message": "Query parameter 'q' must be at least 2 characters"}`
+- `q` missing or < 3 chars → 400 `{"error": "bad_request", "message": "Query parameter 'q' must be at least 3 characters"}`
 - Amadeus API error → 500
 - Amadeus timeout (>10s) → 504
 

@@ -52,6 +52,7 @@ cd frontend && npm run lint
 - `POST /api/v1/flights/price` — Flight price lookup (Amadeus)
 - `POST /api/v1/hotels/search` — Hotel search (LiteAPI)
 - `POST /api/v1/weather` — Historical weather data
+- `POST /api/v1/calendar` — Calendar weather overlay
 - `POST /api/v1/compare` — Score and compare trip options
 
 ## Conventions
@@ -73,6 +74,16 @@ See `.env.example` for required keys:
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
 - Health Check: http://localhost:8000/health
+
+## Ralph Loop (Autonomous Backend Build)
+
+```
+/ralph-loop:ralph-loop "$(cat docs/ralph-backend-prompt.md)" --max-iterations 15
+```
+
+- Prompt: `docs/ralph-backend-prompt.md`
+- API spec: `docs/api-spec.yaml`
+- Progress tracking: `backend/PROGRESS.md` (created by Ralph)
 
 <!-- ooo:START -->
 <!-- ooo:VERSION:0.26.3 -->

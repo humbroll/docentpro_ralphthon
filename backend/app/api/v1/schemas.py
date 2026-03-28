@@ -1,9 +1,11 @@
 """
 API Contract — Source of Truth
 
-All request/response models for the Trip Timing AI API.
+All request/response models for the WhenToGo API.
 Frontend TypeScript types (frontend/src/types/api.ts) must
 stay in sync with these definitions.
+
+See docs/api-spec.yaml for the complete OpenAPI specification.
 """
 
 from datetime import date
@@ -11,14 +13,31 @@ from datetime import date
 from pydantic import BaseModel
 
 
-# ── Requests ──────────────────────────────────────────────
+# ── Error ────────────────────────────────────────────────
 
 
-class SearchRequest(BaseModel):
-    destination: str
-    origin_airport: str  # IATA code, e.g. "ICN"
-    start_date: date
-    end_date: date
+class ErrorResponse(BaseModel):
+    error: str  # machine-readable code
+    message: str  # human-readable description
+
+
+# ── Requests ─────────────────────────────────────────────
+
+
+class FlightPriceRequest(BaseModel):
+    origin: str  # IATA code, e.g. "ICN"
+    destination: str  # IATA code, e.g. "NRT"
+    departure_date: date
+    return_date: date
+    traveler_count: int = 1
+
+
+class HotelSearchRequest(BaseModel):
+    destination: str  # city name
+    latitude: float
+    longitude: float
+    checkin_date: date
+    checkout_date: date
     traveler_count: int = 1
 
 
@@ -29,16 +48,37 @@ class WeatherRequest(BaseModel):
     end_date: date
 
 
-class HotelSearchRequest(BaseModel):
+class CalendarRequest(BaseModel):
     destination: str
     latitude: float
     longitude: float
-    checkin_date: date
-    checkout_date: date
-    traveler_count: int = 1
+    start_date: date
+    end_date: date
 
 
-# ── Responses ─────────────────────────────────────────────
+class WeatherSummaryInput(BaseModel):
+    average_temp: float
+    rain_signal: str  # "low", "medium", "high"
+    weather_score: float  # 0-100
+    label: str  # "Great", "Good", "Fair", "Poor"
+
+
+class CompareOptionInput(BaseModel):
+    destination: str
+    start_date: date
+    end_date: date
+    flight_price: float
+    hotel_name: str
+    hotel_price: float
+    weather: WeatherSummaryInput
+    traveler_count: int
+
+
+class CompareRequest(BaseModel):
+    options: list[CompareOptionInput]
+
+
+# ── Responses ────────────────────────────────────────────
 
 
 class DestinationResult(BaseModel):
@@ -62,7 +102,7 @@ class HotelOption(BaseModel):
     hotel_id: str
     hotel_name: str
     distance: float | None = None  # km from city center
-    total_price: float  # total for all nights
+    total_price: float  # total for all nights and rooms
     rating: float | None = None
 
 
@@ -102,7 +142,7 @@ class CompareResponse(BaseModel):
     best_option_index: int
 
 
-# ── Calendar ──────────────────────────────────────────────
+# ── Calendar ─────────────────────────────────────────────
 
 
 class CalendarDay(BaseModel):
