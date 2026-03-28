@@ -12,6 +12,25 @@ git checkout -b feat/frontend 2>/dev/null || git checkout feat/frontend
 ```
 Work on `feat/frontend` branch ONLY. Never push to `main` directly — a backend engineer is working on `feat/backend` in parallel.
 
+### Dev Servers (KEEP RUNNING AT ALL TIMES)
+**Before writing any code**, start both services and keep them running throughout the session:
+```bash
+docker compose up -d
+```
+This starts:
+- **Backend**: http://localhost:8000 (FastAPI + Swagger at /docs)
+- **Frontend**: http://localhost:3000 (Next.js dev server with hot reload)
+
+After every step, verify your changes are visible at http://localhost:3000 in the browser. If the frontend container crashes, restart it immediately:
+```bash
+docker compose up -d frontend
+```
+
+Check logs if something breaks:
+```bash
+docker compose logs -f frontend
+```
+
 ### Continuation Protocol
 **If `frontend/PROGRESS.md` exists, this is a continuation session.**
 
@@ -174,6 +193,7 @@ Build in this sequence. Each step should result in something visible.
 2. Build CalendarDayCell with weather indicators → `docs/frontend/frontend-spec-weather-calendar-indicators.md`
 3. Implement date range selection → `docs/frontend/frontend-spec-calendar-section.md` §5
 4. Wire to API: calendar weather data
+5. **Visual verification**: Open http://localhost:3000, type a destination (e.g. "Tokyo"), select it. The calendar section MUST appear below the search section showing a 2-month weather grid. If it doesn't appear, debug before moving on.
 
 ### Step 4: Date Option Builder
 1. Build DateOptionBuilderSection → `docs/frontend/frontend-spec-form-components.md` §7
@@ -253,7 +273,7 @@ const showComparison = options.length >= 2;
 
 ## 8. Reminders
 
-1. **Run the dev server**: `cd frontend && npm run dev` — runs at `http://localhost:3000`
+1. **Keep both servers running**: `docker compose up -d` — backend at http://localhost:8000, frontend at http://localhost:3000. Verify in browser after every step.
 2. **Do not modify frozen files** (`api.ts`, `api-spec.yaml`) without reporting
 2. **Read Next.js 16 docs** in `node_modules/next/dist/docs/` — APIs have changed
 3. **Desktop-first** — no mobile/tablet-specific layouts needed
