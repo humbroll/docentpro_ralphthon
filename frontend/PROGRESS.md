@@ -153,3 +153,20 @@
 
 **Build**: `next build` passes with zero TypeScript errors ✅
 **Dev server**: returns HTTP 200 on localhost:3000 ✅
+
+## Iteration 8 — Spec Compliance Audit Fixes — COMPLETED
+**Files modified**:
+- `src/components/comparison/ComparisonTable.tsx` — Option N headers, Best Overall badge, Dates row, min-cost/max-score highlighting, grey.50 summary rows, size=medium + stickyHeader
+- `src/components/comparison/QueueItemCard.tsx` — 2x2 Grid layout with Divider, Travelers field, disabled prop, aria-label
+- `src/components/comparison/ComparisonSection.tsx` — Grid-based queue layout (xs:12/sm:6/md:4), Clear All disabled during loading, remove buttons disabled during loading
+
+**Build**: `next build` passes with zero TypeScript errors ✅
+
+## Cross-Reference Checklist — FINAL VERIFICATION ✅
+- **API Endpoints**: 7/7 wired (health, destinations, flights, hotels, weather, calendar, compare)
+- **Types**: 39/39 defined (14 API types, 14 frontend types, 13 constants)
+- **Components**: 30/30 exist across layout/search/calendar/dateOption/comparison/shared
+- **Edge Cases**: All handled (queue full, duplicates, sub-minimum, cascade reset, IATA null, network errors, empty states)
+- **Progressive Reveal**: 4-section state machine with derived visibility
+- **Build**: Zero TypeScript errors
+- **Dev Server**: HTTP 200
