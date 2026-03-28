@@ -29,7 +29,7 @@ export default function Header() {
             <img
               src="/docentpro-logo.png"
               alt="DocentPro"
-              style={{ height: 32, objectFit: 'contain' }}
+              style={{ height: 24, objectFit: 'contain' }}
             />
           </Stack>
         </Stack>
