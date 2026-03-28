@@ -40,44 +40,89 @@ async def search_hotels(
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         # Step 1: Search hotels by location
+        search_params = {
+            "countryCode": "",
+            "cityName": destination,
+            "latitude": latitude,
+            "longitude": longitude,
+            "limit": 20,
+        }
+        logger.info(
+            "LiteAPI hotel search: %s params=%s",
+            f"{BASE_URL}/data/hotels",
+            search_params,
+        )
         search_resp = await client.get(
             f"{BASE_URL}/data/hotels",
             headers={
                 "X-API-Key": settings.LITEAPI_API_KEY_SEARCH,
             },
-            params={
-                "countryCode": "",
-                "cityName": destination,
-                "latitude": latitude,
-                "longitude": longitude,
-                "limit": 20,
-            },
+            params=search_params,
         )
+        logger.info(
+            "LiteAPI search response: status=%d",
+            search_resp.status_code,
+        )
+        if search_resp.status_code != 200:
+            logger.error(
+                "LiteAPI search failed: %d body=%s",
+                search_resp.status_code,
+                search_resp.text[:500],
+            )
         search_resp.raise_for_status()
         search_data = search_resp.json()
         hotels_raw = search_data.get("data", [])
+        logger.info(
+            "LiteAPI search found %d hotels",
+            len(hotels_raw),
+        )
 
         if not hotels_raw:
+            logger.warning(
+                "LiteAPI: 0 hotels for %s (%.4f,%.4f)",
+                destination,
+                latitude,
+                longitude,
+            )
             return []
 
         hotel_ids = [h["id"] for h in hotels_raw[:20]]
 
         # Step 2: Get rates
+        rates_payload = {
+            "hotelIds": hotel_ids,
+            "checkin": checkin_date.isoformat(),
+            "checkout": checkout_date.isoformat(),
+            "occupancies": occupancies,
+            "currency": "USD",
+            "guestNationality": "US",
+        }
+        logger.info(
+            "LiteAPI rates request: %d hotels "
+            "checkin=%s checkout=%s occ=%s",
+            len(hotel_ids),
+            checkin_date,
+            checkout_date,
+            occupancies,
+        )
         rates_resp = await client.post(
             f"{BASE_URL}/hotels/rates",
             headers={
                 "X-API-Key": settings.LITEAPI_API_KEY_RATES,
                 "Content-Type": "application/json",
             },
-            json={
-                "hotelIds": hotel_ids,
-                "checkin": checkin_date.isoformat(),
-                "checkout": checkout_date.isoformat(),
-                "occupancies": occupancies,
-                "currency": "USD",
-                "guestNationality": "US",
-            },
+            json=rates_payload,
         )
+        logger.info(
+            "LiteAPI rates response: status=%d",
+            rates_resp.status_code,
+        )
+        if rates_resp.status_code != 200:
+            logger.error(
+                "LiteAPI rates failed: %d body=%s",
+                rates_resp.status_code,
+                rates_resp.text[:500],
+            )
         rates_resp.raise_for_status()
         rates_data = rates_resp.json()
 
@@ -101,6 +146,12 @@ async def search_hotels(
                             )
                         except (ValueError, TypeError):
                             pass
+
+        logger.info(
+            "LiteAPI: %d hotels with prices out of %d",
+            len(price_map),
+            len(hotel_ids),
+        )
 
         # Build hotel list from search data + prices
         hotel_meta = {h["id"]: h for h in hotels_raw}
