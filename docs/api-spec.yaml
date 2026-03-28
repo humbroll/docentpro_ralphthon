@@ -1,0 +1,1057 @@
+openapi: "3.1.0"
+info:
+  title: WhenToGo API
+  version: "1.0.0"
+  description: |
+    Travel date optimization engine API.
+    Compares flight prices, hotel rates, and historical weather data
+    to find the optimal travel window.
+
+    ## Scoring Formulas
+
+    ### Weather Score (0–100)
+    ```
+    temp_score = max(0, 100 - |avg_temp - 22| * 5)
+    rain_score = max(0, 100 - daily_rain_mm * 10)
+    weather_score = 0.6 * temp_score + 0.4 * rain_score
+    ```
+    - Ideal temperature: 22°C (1°C deviation = -5 points)
+    - Rain penalty: 1mm = -10 points (>=10mm = 0)
+
+    ### Cost Score (0–100)
+    ```
+    cost_score = 100 * (max_cost - this_cost) / (max_cost - min_cost)
+    ```
+    - Linear interpolation across compared options
+    - If only 1 option: cost_score = 100
+
+    ### Overall Score (0–100)
+    ```
+    overall_score = 0.7 * cost_score + 0.3 * weather_score
+    ```
+
+    ### Hotel Room Calculation
+    ```
+    rooms_needed = ceil(traveler_count / 2)
+    ```
+
+    ### Auto-Tags
+    - `cheapest` — lowest total_trip_cost
+    - `best_weather` — highest weather_score
+    - `best_overall` — highest overall_score
+
+    ## External APIs
+    | Service | Provider | Auth |
+    |---------|----------|------|
+    | Destination search | Amadeus City Search | API key + secret |
+    | Flight pricing | Amadeus Flight Offers | API key + secret |
+    | Hotel search | LiteAPI | API key |
+    | Weather | Open-Meteo Historical | None (free) |
+
+    ## Conventions
+    - Dates: ISO 8601 (`YYYY-MM-DD`)
+    - Currency: USD (fixed)
+    - Language: English
+    - Calendar weather: last year's historical data for the same date range
+    - Timeout: 10s for all external API calls
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+
+tags:
+  - name: Search
+    description: Destination search
+  - name: Flights
+    description: Flight price lookup
+  - name: Hotels
+    description: Hotel search
+  - name: Weather
+    description: Historical weather data
+  - name: Compare
+    description: Trip option scoring and comparison
+  - name: Calendar
+    description: Calendar weather overlay
+  - name: Health
+    description: Health check
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      operationId: healthCheck
+      summary: Health check
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+
+  /api/v1/search/destinations:
+    get:
+      tags: [Search]
+      operationId: searchDestinations
+      summary: Search destinations by city name
+      description: |
+        Searches for cities using the Amadeus City Search API.
+        Returns matching cities with coordinates and IATA airport codes.
+        Frontend uses this for the destination search autocomplete.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: City name search query (minimum 2 characters)
+          schema:
+            type: string
+            minLength: 2
+            example: "Tokyo"
+      responses:
+        "200":
+          description: List of matching destinations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DestinationResult"
+              example:
+                - name: "Tokyo"
+                  latitude: 35.6762
+                  longitude: 139.6503
+                  country: "Japan"
+                  iata_code: "TYO"
+                - name: "Toronto"
+                  latitude: 43.6532
+                  longitude: -79.3832
+                  country: "Canada"
+                  iata_code: "YYZ"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
+
+  /api/v1/flights/price:
+    post:
+      tags: [Flights]
+      operationId: getFlightPrice
+      summary: Get lowest round-trip flight price
+      description: |
+        Fetches the lowest economy round-trip flight price from the
+        Amadeus Flight Offers Search API.
+
+        Returns price **per person**. Frontend calculates group total:
+        `total_flight_cost = flight_price * traveler_count`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlightPriceRequest"
+            example:
+              origin: "ICN"
+              destination: "NRT"
+              departure_date: "2026-05-01"
+              return_date: "2026-05-05"
+              traveler_count: 2
+      responses:
+        "200":
+          description: Lowest round-trip flight price found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightPrice"
+              example:
+                origin: "ICN"
+                destination: "NRT"
+                departure_date: "2026-05-01"
+                return_date: "2026-05-05"
+                price: 342.50
+                currency: "USD"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: No flights found for the given route and dates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "not_found"
+                message: "No flights found for ICN → NRT on 2026-05-01"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
+
+  /api/v1/hotels/search:
+    post:
+      tags: [Hotels]
+      operationId: searchHotels
+      summary: Search hotels near destination
+      description: |
+        Searches for hotels using LiteAPI. Returns the top 5 hotels
+        sorted by total stay price (ascending).
+
+        Room calculation: `rooms_needed = ceil(traveler_count / 2)`
+
+        `total_price` = price per room per night * rooms_needed * number of nights.
+        The user selects 1 hotel from the results to include in their trip option.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HotelSearchRequest"
+            example:
+              destination: "Tokyo"
+              latitude: 35.6762
+              longitude: 139.6503
+              checkin_date: "2026-05-01"
+              checkout_date: "2026-05-05"
+              traveler_count: 2
+      responses:
+        "200":
+          description: Top 5 hotels sorted by total price ascending
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 5
+                items:
+                  $ref: "#/components/schemas/HotelOption"
+              example:
+                - hotel_id: "liteapi_12345"
+                  hotel_name: "Tokyo Inn"
+                  distance: 1.2
+                  total_price: 320.00
+                  rating: 4.2
+                - hotel_id: "liteapi_67890"
+                  hotel_name: "Shinjuku Grand Hotel"
+                  distance: 0.5
+                  total_price: 480.00
+                  rating: 4.5
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: No hotels found for the given destination and dates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "not_found"
+                message: "No hotels found in Tokyo for 2026-05-01 to 2026-05-05"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
+
+  /api/v1/weather:
+    post:
+      tags: [Weather]
+      operationId: getWeather
+      summary: Get historical weather data and score
+      description: |
+        Fetches historical weather data from Open-Meteo for the
+        **same date range in the previous year**.
+
+        Example: requesting 2026-05-01 to 2026-05-05 fetches data
+        for 2025-05-01 to 2025-05-05.
+
+        Returns daily breakdown and a summary with the calculated
+        weather_score (0–100).
+
+        ### Weather Score Formula
+        ```
+        temp_score = max(0, 100 - |avg_temp - 22| * 5)
+        rain_score = max(0, 100 - daily_rain_mm * 10)
+        weather_score = 0.6 * temp_score + 0.4 * rain_score
+        ```
+
+        ### Rain Signal
+        - `low`: avg daily rain < 2mm
+        - `medium`: avg daily rain 2–5mm
+        - `high`: avg daily rain > 5mm
+
+        ### Weather Label
+        - `Great`: score >= 80
+        - `Good`: score >= 60
+        - `Fair`: score >= 40
+        - `Poor`: score < 40
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WeatherRequest"
+            example:
+              latitude: 35.6762
+              longitude: 139.6503
+              start_date: "2026-05-01"
+              end_date: "2026-05-05"
+      responses:
+        "200":
+          description: Weather summary with daily breakdown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WeatherSummary"
+              example:
+                average_temp: 21.3
+                rain_signal: "low"
+                weather_score: 82.4
+                label: "Great"
+                daily:
+                  - date: "2025-05-01"
+                    temp_high: 24.0
+                    temp_low: 16.0
+                    rain_mm: 0.0
+                    description: "Clear sky"
+                  - date: "2025-05-02"
+                    temp_high: 23.5
+                    temp_low: 17.2
+                    rain_mm: 1.2
+                    description: "Partly cloudy"
+                  - date: "2025-05-03"
+                    temp_high: 22.0
+                    temp_low: 15.8
+                    rain_mm: 0.0
+                    description: "Clear sky"
+                  - date: "2025-05-04"
+                    temp_high: 25.1
+                    temp_low: 18.0
+                    rain_mm: 0.5
+                    description: "Partly cloudy"
+                  - date: "2025-05-05"
+                    temp_high: 21.8
+                    temp_low: 16.5
+                    rain_mm: 0.0
+                    description: "Clear sky"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
+
+  /api/v1/calendar:
+    post:
+      tags: [Calendar]
+      operationId: getCalendarWeather
+      summary: Get weather data for calendar overlay
+      description: |
+        Returns daily weather data for a 2-month range to display
+        on the calendar UI. Uses last year's historical data from Open-Meteo.
+
+        Frontend uses this to show weather conditions on each calendar day
+        before the user selects their date range.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalendarRequest"
+            example:
+              destination: "Tokyo"
+              latitude: 35.6762
+              longitude: 139.6503
+              start_date: "2026-05-01"
+              end_date: "2026-06-30"
+      responses:
+        "200":
+          description: Calendar weather data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarResponse"
+              example:
+                destination: "Tokyo"
+                days:
+                  - date: "2026-05-01"
+                    temp_high: 24.0
+                    temp_low: 16.0
+                    rain_mm: 0.0
+                    weather_label: "Great"
+                  - date: "2026-05-02"
+                    temp_high: 23.5
+                    temp_low: 17.2
+                    rain_mm: 1.2
+                    weather_label: "Good"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
+
+  /api/v1/compare:
+    post:
+      tags: [Compare]
+      operationId: compareTrips
+      summary: Score and compare trip options
+      description: |
+        Receives an array of trip options (2–5) from the frontend,
+        calculates cost_score and overall_score for each, assigns
+        auto-tags, and returns ranked results.
+
+        The frontend collects flight/hotel/weather data from individual
+        APIs and sends the assembled options here for scoring only.
+
+        ### Scoring Pipeline
+        1. Calculate `total_trip_cost` = `flight_price * traveler_count + hotel_price`
+        2. Calculate `cost_per_person` = `total_trip_cost / traveler_count`
+        3. Calculate `cost_score` via linear interpolation across all options
+        4. Calculate `overall_score` = `0.7 * cost_score + 0.3 * weather_score`
+        5. Assign tags: `cheapest`, `best_weather`, `best_overall`
+        6. Return sorted by `overall_score` descending
+
+        ### Tag Assignment Rules
+        - `cheapest`: option with lowest `total_trip_cost`
+        - `best_weather`: option with highest `weather_score`
+        - `best_overall`: option with highest `overall_score`
+        - An option can have multiple tags
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompareRequest"
+            example:
+              options:
+                - destination: "Tokyo"
+                  start_date: "2026-05-01"
+                  end_date: "2026-05-05"
+                  flight_price: 342.50
+                  hotel_name: "Tokyo Inn"
+                  hotel_price: 320.00
+                  weather:
+                    average_temp: 21.3
+                    rain_signal: "low"
+                    weather_score: 82.4
+                    label: "Great"
+                  traveler_count: 2
+                - destination: "Tokyo"
+                  start_date: "2026-05-15"
+                  end_date: "2026-05-19"
+                  flight_price: 289.00
+                  hotel_name: "Tokyo Inn"
+                  hotel_price: 295.00
+                  weather:
+                    average_temp: 23.8
+                    rain_signal: "medium"
+                    weather_score: 68.2
+                    label: "Good"
+                  traveler_count: 2
+      responses:
+        "200":
+          description: Scored and ranked trip options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompareResponse"
+              example:
+                options:
+                  - destination: "Tokyo"
+                    start_date: "2026-05-15"
+                    end_date: "2026-05-19"
+                    flight_price: 289.00
+                    hotel_name: "Tokyo Inn"
+                    hotel_price: 295.00
+                    weather:
+                      average_temp: 23.8
+                      rain_signal: "medium"
+                      weather_score: 68.2
+                      label: "Good"
+                    traveler_count: 2
+                    total_trip_cost: 873.00
+                    cost_per_person: 436.50
+                    overall_score: 90.46
+                    tags: ["cheapest", "best_overall"]
+                  - destination: "Tokyo"
+                    start_date: "2026-05-01"
+                    end_date: "2026-05-05"
+                    flight_price: 342.50
+                    hotel_name: "Tokyo Inn"
+                    hotel_price: 320.00
+                    weather:
+                      average_temp: 21.3
+                      rain_signal: "low"
+                      weather_score: 82.4
+                      label: "Great"
+                    traveler_count: 2
+                    total_trip_cost: 1005.00
+                    cost_per_person: 502.50
+                    overall_score: 24.72
+                    tags: ["best_weather"]
+                best_option_index: 0
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          description: Invalid option data (e.g., fewer than 2 options)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "validation_error"
+                message: "At least 2 options are required for comparison"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  schemas:
+    # ── Error ──────────────────────────────────────────────────
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+          example: "not_found"
+        message:
+          type: string
+          description: Human-readable error description
+          example: "No flights found for ICN → NRT on 2026-05-01"
+
+    # ── Requests ───────────────────────────────────────────────
+
+    FlightPriceRequest:
+      type: object
+      required: [origin, destination, departure_date, return_date]
+      properties:
+        origin:
+          type: string
+          description: Origin airport IATA code
+          example: "ICN"
+          minLength: 3
+          maxLength: 3
+        destination:
+          type: string
+          description: Destination airport IATA code
+          example: "NRT"
+          minLength: 3
+          maxLength: 3
+        departure_date:
+          type: string
+          format: date
+          description: Departure date (must be in the future)
+          example: "2026-05-01"
+        return_date:
+          type: string
+          format: date
+          description: Return date (must be after departure_date)
+          example: "2026-05-05"
+        traveler_count:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Number of travelers (used by Amadeus for accurate pricing)
+          example: 2
+
+    HotelSearchRequest:
+      type: object
+      required: [destination, latitude, longitude, checkin_date, checkout_date]
+      properties:
+        destination:
+          type: string
+          description: City name for display purposes
+          example: "Tokyo"
+        latitude:
+          type: number
+          format: double
+          description: Destination latitude
+          example: 35.6762
+        longitude:
+          type: number
+          format: double
+          description: Destination longitude
+          example: 139.6503
+        checkin_date:
+          type: string
+          format: date
+          description: Check-in date
+          example: "2026-05-01"
+        checkout_date:
+          type: string
+          format: date
+          description: Check-out date (must be after checkin_date)
+          example: "2026-05-05"
+        traveler_count:
+          type: integer
+          minimum: 1
+          default: 1
+          description: |
+            Number of travelers.
+            Rooms calculated as ceil(traveler_count / 2).
+          example: 2
+
+    WeatherRequest:
+      type: object
+      required: [latitude, longitude, start_date, end_date]
+      properties:
+        latitude:
+          type: number
+          format: double
+          description: Location latitude
+          example: 35.6762
+        longitude:
+          type: number
+          format: double
+          description: Location longitude
+          example: 139.6503
+        start_date:
+          type: string
+          format: date
+          description: Start date of trip (backend fetches last year's data for this range)
+          example: "2026-05-01"
+        end_date:
+          type: string
+          format: date
+          description: End date of trip
+          example: "2026-05-05"
+
+    CalendarRequest:
+      type: object
+      required: [destination, latitude, longitude, start_date, end_date]
+      properties:
+        destination:
+          type: string
+          description: City name
+          example: "Tokyo"
+        latitude:
+          type: number
+          format: double
+          description: Location latitude
+          example: 35.6762
+        longitude:
+          type: number
+          format: double
+          description: Location longitude
+          example: 139.6503
+        start_date:
+          type: string
+          format: date
+          description: Calendar start date (typically 1st of current month)
+          example: "2026-05-01"
+        end_date:
+          type: string
+          format: date
+          description: Calendar end date (typically ~2 months from start)
+          example: "2026-06-30"
+
+    CompareRequest:
+      type: object
+      required: [options]
+      properties:
+        options:
+          type: array
+          minItems: 2
+          maxItems: 5
+          description: Trip options to compare (2–5 items)
+          items:
+            $ref: "#/components/schemas/CompareOptionInput"
+
+    CompareOptionInput:
+      type: object
+      required:
+        - destination
+        - start_date
+        - end_date
+        - flight_price
+        - hotel_name
+        - hotel_price
+        - weather
+        - traveler_count
+      properties:
+        destination:
+          type: string
+          description: Destination city name
+          example: "Tokyo"
+        start_date:
+          type: string
+          format: date
+          example: "2026-05-01"
+        end_date:
+          type: string
+          format: date
+          example: "2026-05-05"
+        flight_price:
+          type: number
+          format: double
+          description: Lowest economy round-trip price per person (USD)
+          example: 342.50
+        hotel_name:
+          type: string
+          description: Selected hotel name
+          example: "Tokyo Inn"
+        hotel_price:
+          type: number
+          format: double
+          description: Total hotel cost for all nights and rooms (USD)
+          example: 320.00
+        weather:
+          $ref: "#/components/schemas/WeatherSummaryInput"
+        traveler_count:
+          type: integer
+          minimum: 1
+          description: Number of travelers
+          example: 2
+
+    WeatherSummaryInput:
+      type: object
+      required: [average_temp, rain_signal, weather_score, label]
+      properties:
+        average_temp:
+          type: number
+          format: double
+          description: Average temperature in Celsius
+          example: 21.3
+        rain_signal:
+          type: string
+          enum: ["low", "medium", "high"]
+          description: "Rain level: low (<2mm/day), medium (2-5mm), high (>5mm)"
+          example: "low"
+        weather_score:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          description: Calculated weather score (0–100)
+          example: 82.4
+        label:
+          type: string
+          enum: ["Great", "Good", "Fair", "Poor"]
+          description: "Human-readable label: Great (>=80), Good (>=60), Fair (>=40), Poor (<40)"
+          example: "Great"
+
+    # ── Responses ──────────────────────────────────────────────
+
+    DestinationResult:
+      type: object
+      required: [name, latitude, longitude, country]
+      properties:
+        name:
+          type: string
+          description: City name
+          example: "Tokyo"
+        latitude:
+          type: number
+          format: double
+          description: City latitude
+          example: 35.6762
+        longitude:
+          type: number
+          format: double
+          description: City longitude
+          example: 139.6503
+        country:
+          type: string
+          description: Country name
+          example: "Japan"
+        iata_code:
+          type: string
+          nullable: true
+          description: Primary airport IATA code (null if unavailable)
+          example: "TYO"
+
+    FlightPrice:
+      type: object
+      required: [origin, destination, departure_date, return_date, price, currency]
+      properties:
+        origin:
+          type: string
+          description: Origin airport IATA code
+          example: "ICN"
+        destination:
+          type: string
+          description: Destination airport IATA code
+          example: "NRT"
+        departure_date:
+          type: string
+          format: date
+          example: "2026-05-01"
+        return_date:
+          type: string
+          format: date
+          example: "2026-05-05"
+        price:
+          type: number
+          format: double
+          description: Lowest economy round-trip price per person
+          example: 342.50
+        currency:
+          type: string
+          default: "USD"
+          description: Currency code (always USD for MVP)
+          example: "USD"
+
+    HotelOption:
+      type: object
+      required: [hotel_id, hotel_name, total_price]
+      properties:
+        hotel_id:
+          type: string
+          description: Hotel ID from LiteAPI
+          example: "liteapi_12345"
+        hotel_name:
+          type: string
+          description: Hotel name
+          example: "Tokyo Inn"
+        distance:
+          type: number
+          format: double
+          nullable: true
+          description: Distance from city center in km (null if unavailable)
+          example: 1.2
+        total_price:
+          type: number
+          format: double
+          description: Total hotel cost for all nights and all rooms (USD)
+          example: 320.00
+        rating:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          maximum: 5
+          description: Hotel rating (0–5 scale, null if unavailable)
+          example: 4.2
+
+    WeatherDay:
+      type: object
+      required: [date, temp_high, temp_low, rain_mm, description]
+      properties:
+        date:
+          type: string
+          format: date
+          description: Date of the weather record (from previous year)
+          example: "2025-05-01"
+        temp_high:
+          type: number
+          format: double
+          description: Daily high temperature in Celsius
+          example: 24.0
+        temp_low:
+          type: number
+          format: double
+          description: Daily low temperature in Celsius
+          example: 16.0
+        rain_mm:
+          type: number
+          format: double
+          minimum: 0
+          description: Daily rainfall in millimeters
+          example: 0.0
+        description:
+          type: string
+          description: Weather condition description
+          example: "Clear sky"
+
+    WeatherSummary:
+      type: object
+      required: [average_temp, rain_signal, weather_score, label]
+      properties:
+        average_temp:
+          type: number
+          format: double
+          description: Average temperature across the date range (Celsius)
+          example: 21.3
+        rain_signal:
+          type: string
+          enum: ["low", "medium", "high"]
+          description: "Rain level: low (<2mm avg/day), medium (2-5mm), high (>5mm)"
+          example: "low"
+        weather_score:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          description: |
+            Calculated weather score (0–100).
+            Formula: 0.6 * temp_score + 0.4 * rain_score
+          example: 82.4
+        label:
+          type: string
+          enum: ["Great", "Good", "Fair", "Poor"]
+          description: "Human-readable label based on weather_score"
+          example: "Great"
+        daily:
+          type: array
+          description: Daily weather breakdown
+          items:
+            $ref: "#/components/schemas/WeatherDay"
+
+    CalendarDay:
+      type: object
+      required: [date]
+      properties:
+        date:
+          type: string
+          format: date
+          description: Calendar date
+          example: "2026-05-01"
+        temp_high:
+          type: number
+          format: double
+          nullable: true
+          description: Daily high temperature (Celsius)
+          example: 24.0
+        temp_low:
+          type: number
+          format: double
+          nullable: true
+          description: Daily low temperature (Celsius)
+          example: 16.0
+        rain_mm:
+          type: number
+          format: double
+          nullable: true
+          description: Daily rainfall (mm)
+          example: 0.0
+        weather_label:
+          type: string
+          nullable: true
+          enum: ["Great", "Good", "Fair", "Poor"]
+          description: Weather quality label for this day
+          example: "Great"
+
+    CalendarResponse:
+      type: object
+      required: [destination, days]
+      properties:
+        destination:
+          type: string
+          description: City name
+          example: "Tokyo"
+        days:
+          type: array
+          description: Daily weather data for the calendar range
+          items:
+            $ref: "#/components/schemas/CalendarDay"
+
+    TripOption:
+      type: object
+      required:
+        - destination
+        - start_date
+        - end_date
+        - flight_price
+        - hotel_name
+        - hotel_price
+        - weather
+        - traveler_count
+        - total_trip_cost
+        - cost_per_person
+        - overall_score
+      properties:
+        destination:
+          type: string
+          example: "Tokyo"
+        start_date:
+          type: string
+          format: date
+          example: "2026-05-01"
+        end_date:
+          type: string
+          format: date
+          example: "2026-05-05"
+        flight_price:
+          type: number
+          format: double
+          description: Round-trip price per person (USD)
+          example: 342.50
+        hotel_name:
+          type: string
+          description: Selected hotel name
+          example: "Tokyo Inn"
+        hotel_price:
+          type: number
+          format: double
+          description: Total hotel cost (USD)
+          example: 320.00
+        weather:
+          $ref: "#/components/schemas/WeatherSummary"
+        traveler_count:
+          type: integer
+          minimum: 1
+          example: 2
+        total_trip_cost:
+          type: number
+          format: double
+          description: "flight_price * traveler_count + hotel_price"
+          example: 1005.00
+        cost_per_person:
+          type: number
+          format: double
+          description: "total_trip_cost / traveler_count"
+          example: 502.50
+        overall_score:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          description: "0.7 * cost_score + 0.3 * weather_score"
+          example: 24.72
+        tags:
+          type: array
+          items:
+            type: string
+            enum: ["cheapest", "best_weather", "best_overall"]
+          description: Auto-assigned tags
+          example: ["best_weather"]
+
+    CompareResponse:
+      type: object
+      required: [options, best_option_index]
+      properties:
+        options:
+          type: array
+          description: Scored trip options sorted by overall_score descending
+          items:
+            $ref: "#/components/schemas/TripOption"
+        best_option_index:
+          type: integer
+          minimum: 0
+          description: Index of the best overall option in the sorted array (always 0)
+          example: 0
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "bad_request"
+            message: "Query parameter 'q' is required"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "internal_error"
+            message: "An unexpected error occurred"
+
+    GatewayTimeout:
+      description: External API call timed out (10s limit)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "gateway_timeout"
+            message: "External API request timed out after 10 seconds"
