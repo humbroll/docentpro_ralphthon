@@ -231,7 +231,6 @@ export default function HomePage() {
                     <TableCell sx={{ fontWeight: 600 }} align="right">Hotel</TableCell>
                     <TableCell sx={{ fontWeight: 600 }} align="right">Total/pp</TableCell>
                     <TableCell sx={{ fontWeight: 600 }} align="center">Weather</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }} align="right">Score</TableCell>
                     <TableCell padding="checkbox" />
                   </TableRow>
                 </TableHead>
@@ -266,11 +265,6 @@ export default function HomePage() {
                               fontSize: '0.7rem',
                             }}
                           />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2" fontWeight={500}>
-                            {item.weather.weather_score.toFixed(0)}
-                          </Typography>
                         </TableCell>
                         <TableCell padding="checkbox">
                           <IconButton size="small" onClick={() => removeItem(item.id)}>
