@@ -1,5 +1,6 @@
 """POST /api/v1/flights/price — flight price lookup."""
 
+import logging
 from datetime import date
 
 from fastapi import APIRouter
@@ -10,6 +11,7 @@ from amadeus import ResponseError
 from app.api.v1.schemas import FlightPrice, FlightPriceRequest
 from app.services.amadeus_service import search_flights
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -49,12 +51,20 @@ async def get_flight_price(req: FlightPriceRequest):
             traveler_count=req.traveler_count,
         )
     except ResponseError as e:
-        status = getattr(
-            getattr(e, "response", None),
-            "status_code",
-            500,
+        resp = getattr(e, "response", None)
+        status = getattr(resp, "status_code", 500)
+        body = getattr(resp, "body", None)
+        logger.error(
+            "Amadeus ResponseError [%s] %s→%s %s-%s: %s | body=%s",
+            status,
+            req.origin,
+            req.destination,
+            req.departure_date,
+            req.return_date,
+            e,
+            body,
         )
-        if status == 404 or "LOCATION" in str(e):
+        if status in (400, 404) or "LOCATION" in str(e):
             return JSONResponse(
                 status_code=404,
                 content={
@@ -64,6 +74,7 @@ async def get_flight_price(req: FlightPriceRequest):
                         f" {req.origin} →"
                         f" {req.destination}"
                         f" on {req.departure_date}"
+                        f" (Amadeus: {status})"
                     ),
                 },
             )
@@ -71,7 +82,10 @@ async def get_flight_price(req: FlightPriceRequest):
             status_code=500,
             content={
                 "error": "internal_error",
-                "message": f"Amadeus API error: {e}",
+                "message": (
+                    f"Amadeus API error [{status}]:"
+                    f" {e}"
+                ),
             },
         )
     except Exception as e:

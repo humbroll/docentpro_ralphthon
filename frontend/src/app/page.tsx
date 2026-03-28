@@ -3,13 +3,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import Grid from '@mui/material/Grid';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Paper from '@mui/material/Paper';
+import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
+import CloseIcon from '@mui/icons-material/Close';
 import { SearchSection } from '@/components/search/SearchSection';
 import { CalendarSection } from '@/components/calendar/CalendarSection';
 import { DateOptionBuilderSection } from '@/components/dateOption/DateOptionBuilderSection';
 import { ComparisonSection } from '@/components/comparison/ComparisonSection';
-import { QueueItemCard } from '@/components/comparison/QueueItemCard';
 import { SectionContainer } from '@/components/layout/SectionContainer';
+import { WEATHER_LABEL_COLORS } from '@/types/constants';
 import { useComparisonQueue } from '@/context/ComparisonQueueContext';
 import { getFlightPrice, searchHotels, getWeather, extractApiError } from '@/lib/api';
 import type { DestinationResult, HotelOption } from '@/types/api';
@@ -204,19 +213,73 @@ export default function HomePage() {
 
       {/* Section 3: Date Details (after date range confirmed) */}
       <SectionContainer visible={showDateDetails}>
-        {/* Queued options summary */}
+        {/* Queued options comparison table */}
         {queueCount > 0 && (
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
               Queued for comparison ({queueCount})
             </Typography>
-            <Grid container spacing={1.5}>
-              {queue.map((item) => (
-                <Grid key={item.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                  <QueueItemCard item={item} onRemove={removeItem} />
-                </Grid>
-              ))}
-            </Grid>
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'grey.50' }}>
+                    <TableCell sx={{ fontWeight: 600 }}>Dates</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }} align="right">Flight/pp</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }} align="right">Hotel</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }} align="right">Total/pp</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }} align="center">Weather</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }} align="right">Score</TableCell>
+                    <TableCell padding="checkbox" />
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {queue.map((item) => {
+                    const totalPerPerson = item.flightPrice + item.hotelPrice / item.travelerCount;
+                    return (
+                      <TableRow key={item.id} hover>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={500}>
+                            {new Date(item.startDate).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
+                            {' – '}
+                            {new Date(item.endDate).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {item.destination}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">${item.flightPrice.toFixed(0)}</TableCell>
+                        <TableCell align="right">${item.hotelPrice.toFixed(0)}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          ${totalPerPerson.toFixed(0)}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={`${item.weather.label} (${item.weather.weather_score.toFixed(0)})`}
+                            size="small"
+                            sx={{
+                              bgcolor: WEATHER_LABEL_COLORS[item.weather.label] ?? 'grey.400',
+                              color: '#fff',
+                              fontWeight: 500,
+                              fontSize: '0.7rem',
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" fontWeight={500}>
+                            {item.weather.weather_score.toFixed(0)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell padding="checkbox">
+                          <IconButton size="small" onClick={() => removeItem(item.id)}>
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Box>
         )}
 
