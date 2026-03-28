@@ -24,7 +24,7 @@ export default function Header() {
           </Typography>
           <Stack direction="row" alignItems="center" spacing={0.5} sx={{ opacity: 0.8 }}>
             <Typography variant="caption" sx={{ color: 'inherit', fontSize: '0.7rem' }}>
-              featured by
+              by
             </Typography>
             <img
               src="/docentpro-logo.png"
