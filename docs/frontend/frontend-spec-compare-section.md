@@ -1,0 +1,1153 @@
+# Frontend Specification: Compare Section — Wireframe-Level Layout
+
+> **Audience**: Ralph Loop (autonomous implementation agent)
+> **Parent doc**: `docs/frontend/frontend-spec.md` (Section 2, SectionContainer[comparison] → ComparisonSection)
+> **API endpoint**: `POST /api/v1/compare`
+> **Response type**: `CompareResponse` (from `frontend/src/types/api.ts`)
+> **Prerequisite**: This section renders inside `SectionContainer` with `sectionId="comparison"`, visible when comparison queue has ≥1 items.
+
+---
+
+## Table of Contents
+
+1. [Section Overview & Visual Architecture](#1-section-overview--visual-architecture)
+2. [Comparison Queue Panel](#2-comparison-queue-panel)
+3. [Side-by-Side Comparison Table](#3-side-by-side-comparison-table)
+4. [Score Summary Cards](#4-score-summary-cards)
+5. [Cost Breakdown Bar Chart](#5-cost-breakdown-bar-chart)
+6. [Score Radar/Bar Chart](#6-score-comparison-bar-chart)
+7. [Winner Banner](#7-winner-banner)
+8. [Responsive Column Behavior](#8-responsive-column-behavior)
+9. [Component File Structure](#9-component-file-structure)
+10. [Component Signatures](#10-component-signatures)
+11. [State Management & Data Flow](#11-state-management--data-flow)
+12. [Edge Cases & Boundary Conditions](#12-edge-cases--boundary-conditions)
+
+---
+
+## 1. Section Overview & Visual Architecture
+
+The Compare section is the final section in the progressive-reveal flow. It occupies the full width of `PageContainer` (max-width 1200px, centered). The section is divided into two vertical zones:
+
+**Zone A — Queue Management** (always visible when section is visible)
+**Zone B — Comparison Results** (visible only after a successful compare API call)
+
+### 1.1 Full Section Wireframe (ASCII)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  SectionContainer: title="Compare Options"                                  │
+│  subtitle="Add at least 2 date options to compare. Maximum 5."             │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │ ZONE A: COMPARISON QUEUE PANEL                                         ││
+│  │                                                                         ││
+│  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌─ ─ ─ ─ ─ ┐            ││
+│  │  │ Queue Item │ │ Queue Item │ │ Queue Item │ │  Empty    │            ││
+│  │  │   Card 1   │ │   Card 2   │ │   Card 3   │ │  Slot     │            ││
+│  │  └────────────┘ └────────────┘ └────────────┘ └─ ─ ─ ─ ─ ┘            ││
+│  │                                                                         ││
+│  │  [ Clear All ]                                  [ Compare (3) → ]      ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │ ZONE B: COMPARISON RESULTS (visible after successful compare)          ││
+│  │                                                                         ││
+│  │  ┌───────────────────────────────────────────────────────────────────┐  ││
+│  │  │ WINNER BANNER                                                     │  ││
+│  │  │ "🏆 Best Overall: Tokyo, May 15–19 — Score: 90.5"                │  ││
+│  │  └───────────────────────────────────────────────────────────────────┘  ││
+│  │                                                                         ││
+│  │  ┌───────────────────────────────────────────────────────────────────┐  ││
+│  │  │ SCORE SUMMARY CARDS (horizontal row)                              │  ││
+│  │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐                        │  ││
+│  │  │  │ Cheapest │  │  Best    │  │  Best    │                        │  ││
+│  │  │  │  Trip    │  │ Weather  │  │ Overall  │                        │  ││
+│  │  │  │ $873.00  │  │ "Great"  │  │ 90.5/100 │                        │  ││
+│  │  │  │ May15-19 │  │ May1-5   │  │ May15-19 │                        │  ││
+│  │  │  └──────────┘  └──────────┘  └──────────┘                        │  ││
+│  │  └───────────────────────────────────────────────────────────────────┘  ││
+│  │                                                                         ││
+│  │  ┌───────────────────────────────────────────────────────────────────┐  ││
+│  │  │ SIDE-BY-SIDE COMPARISON TABLE                                     │  ││
+│  │  │                                                                     │  ││
+│  │  │  ┌──────────┬──────────┬──────────┬──────────┐                     │  ││
+│  │  │  │ Metric   │ Option 1 │ Option 2 │ Option 3 │                     │  ││
+│  │  │  ├──────────┼──────────┼──────────┼──────────┤                     │  ││
+│  │  │  │ Dates    │ May15-19 │ May1-5   │ Jun1-5   │                     │  ││
+│  │  │  │ Flight/pp│ $289.00  │ $342.50  │ $310.00  │                     │  ││
+│  │  │  │ Hotel    │ Tokyo Inn│ Tokyo Inn│ Grand Htl│                     │  ││
+│  │  │  │ Hotel $  │ $295.00  │ $320.00  │ $350.00  │                     │  ││
+│  │  │  │ Weather  │ Good 68  │ Great 82 │ Fair 55  │                     │  ││
+│  │  │  │ Total $  │ $873.00  │$1,005.00 │ $970.00  │                     │  ││
+│  │  │  │ Per/pp   │ $436.50  │ $502.50  │ $485.00  │                     │  ││
+│  │  │  │ Score    │  90.5    │  24.7    │  52.3    │                     │  ││
+│  │  │  │ Tags     │ Cheapest │Best Wthr │          │                     │  ││
+│  │  │  │          │Best Ovrll│          │          │                     │  ││
+│  │  │  └──────────┴──────────┴──────────┴──────────┘                     │  ││
+│  │  └───────────────────────────────────────────────────────────────────┘  ││
+│  │                                                                         ││
+│  │  ┌──────────────────────────────┬────────────────────────────────────┐  ││
+│  │  │ COST BREAKDOWN BAR CHART    │ SCORE COMPARISON BAR CHART         │  ││
+│  │  │                              │                                    │  ││
+│  │  │  Option1 ████████ $873      │  Option1 ████████████████ 90.5     │  ││
+│  │  │  Option2 ███████████ $1005  │  Option2 ████ 24.7                 │  ││
+│  │  │  Option3 ██████████ $970    │  Option3 ██████████ 52.3           │  ││
+│  │  │                              │                                    │  ││
+│  │  │  (stacked: flight + hotel)  │  (stacked: cost 70% + weather 30%)│  ││
+│  │  └──────────────────────────────┴────────────────────────────────────┘  ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.2 Vertical Stack Order (top to bottom)
+
+1. **Queue Panel** (Zone A) — always rendered when section is visible
+2. **Winner Banner** — rendered only in success state
+3. **Score Summary Cards** — rendered only in success state
+4. **Comparison Table** — rendered only in success state (or loading skeleton / error)
+5. **Charts Row** — rendered only in success state
+
+Each sub-section is separated by `mb: 4` (32px spacing).
+
+---
+
+## 2. Comparison Queue Panel
+
+**Component**: `ComparisonQueuePanel`
+**File**: `src/components/compare/ComparisonQueuePanel.tsx`
+**Directive**: `'use client'`
+
+### 2.1 Layout Structure
+
+The queue panel is a MUI `Paper` with `variant="outlined"`, `sx={{ p: 3 }}`.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Paper (variant="outlined", p: 3)                                │
+│                                                                  │
+│  Typography: "Your Date Options" (variant="h6", mb: 2)          │
+│                                                                  │
+│  ┌─ Grid container, spacing: 2, columns vary by queue size ────┐│
+│  │                                                               ││
+│  │  ┌─ QueueItemCard ─┐  ┌─ QueueItemCard ─┐  ┌─ EmptySlot ─┐ ││
+│  │  │ Grid item       │  │ Grid item       │  │ Grid item   │ ││
+│  │  │ xs=12           │  │ xs=12           │  │ xs=12       │ ││
+│  │  │ sm=6            │  │ sm=6            │  │ sm=6        │ ││
+│  │  │ md=4            │  │ md=4            │  │ md=4        │ ││
+│  │  └─────────────────┘  └─────────────────┘  └─────────────┘ ││
+│  └───────────────────────────────────────────────────────────────┘│
+│                                                                  │
+│  ┌─ Box (display: flex, justifyContent: space-between, mt: 2) ─┐│
+│  │  Button: "Clear All" (variant="text", color="error",         ││
+│  │          size="small", startIcon=DeleteOutlineIcon)           ││
+│  │                                                               ││
+│  │  Button: "Compare (N)" (variant="contained", color="primary",││
+│  │          size="large", endIcon=CompareArrowsIcon)             ││
+│  └───────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 2.2 Queue Item Card
+
+**Component**: `QueueItemCard`
+**File**: `src/components/compare/QueueItemCard.tsx`
+
+Each queued item renders as a MUI `Card` with `variant="outlined"`.
+
+```
+┌───────────────────────────────────────────┐
+│ Card (variant="outlined")                  │
+│ CardContent (sx={{ p: 2, '&:last-child': { pb: 2 } }})        │
+│                                            │
+│  ┌─ Box (display: flex, justifyContent: space-between) ───────┐│
+│  │                                                             ││
+│  │  ┌─ Left content ──────────────────┐  ┌─ IconButton ──┐   ││
+│  │  │                                  │  │ CloseIcon     │   ││
+│  │  │  Typography (variant="subtitle1",│  │ size="small"  │   ││
+│  │  │    fontWeight: 600):             │  │ color="error" │   ││
+│  │  │  "{destination}"                 │  │ onClick=      │   ││
+│  │  │                                  │  │  removeItem   │   ││
+│  │  │  Typography (variant="body2",    │  └───────────────┘   ││
+│  │  │    color="text.secondary"):      │                       ││
+│  │  │  "May 1 – May 5, 2026"          │                       ││
+│  │  │  (formatted via dayjs:           │                       ││
+│  │  │   dayjs(startDate).format(       │                       ││
+│  │  │     'MMM D') + ' – ' +          │                       ││
+│  │  │   dayjs(endDate).format(         │                       ││
+│  │  │     'MMM D, YYYY'))             │                       ││
+│  │  │                                  │                       ││
+│  │  └──────────────────────────────────┘                       ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                  │
+│  Divider (sx={{ my: 1 }})                                       │
+│                                                                  │
+│  ┌─ Grid container, spacing: 1, columns: 2 ───────────────────┐│
+│  │                                                               ││
+│  │  ┌─ Grid item (xs=6) ──┐  ┌─ Grid item (xs=6) ──┐         ││
+│  │  │ Typography caption:  │  │ Typography caption:  │         ││
+│  │  │ "Flight/pp"          │  │ "Hotel"              │         ││
+│  │  │ Typography body2:    │  │ Typography body2:    │         ││
+│  │  │ "$289.00"            │  │ "$295.00"            │         ││
+│  │  │ (formatted:          │  │ (formatted:          │         ││
+│  │  │  $+flightPrice       │  │  $+hotelPrice        │         ││
+│  │  │  .toFixed(2))        │  │  .toFixed(2))        │         ││
+│  │  └──────────────────────┘  └──────────────────────┘         ││
+│  │                                                               ││
+│  │  ┌─ Grid item (xs=6) ──┐  ┌─ Grid item (xs=6) ──┐         ││
+│  │  │ Typography caption:  │  │ Typography caption:  │         ││
+│  │  │ "Weather"            │  │ "Travelers"          │         ││
+│  │  │ Chip (size="small"): │  │ Typography body2:    │         ││
+│  │  │ label={weather.label}│  │ "{travelerCount}"    │         ││
+│  │  │ color mapped:        │  │                      │         ││
+│  │  │  Great→"success"     │  │                      │         ││
+│  │  │  Good→"info"         │  │                      │         ││
+│  │  │  Fair→"warning"      │  │                      │         ││
+│  │  │  Poor→"error"        │  │                      │         ││
+│  │  └──────────────────────┘  └──────────────────────┘         ││
+│  └───────────────────────────────────────────────────────────────┘│
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### 2.3 Empty Slot Placeholder
+
+When the queue has fewer than 5 items, render dashed-border placeholder cards for remaining slots. These provide visual feedback about available capacity.
+
+```
+┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
+│                                             │
+│  Box (display: flex, alignItems: center,    │
+│    justifyContent: center,                  │
+│    minHeight: 160,                          │
+│    border: '2px dashed',                    │
+│    borderColor: 'divider',                  │
+│    borderRadius: 1,                         │
+│    bgcolor: 'action.hover',                 │
+│    opacity: 0.5)                            │
+│                                             │
+│    Typography (variant="body2",             │
+│      color="text.disabled"):                │
+│      "Empty slot"                           │
+│                                             │
+└ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
+```
+
+**Slot count logic**: Render `MAX_QUEUE_SIZE - queue.length` empty slots. If queue has 3 items, render 2 empty slots. If queue has 5 items, render 0 empty slots.
+
+### 2.4 Compare Button States
+
+| Queue Count | Button Text | Button State | Additional |
+|-------------|-------------|-------------|------------|
+| 0 | "Compare" | `disabled` | — |
+| 1 | "Compare (1)" | `disabled`, tooltip: "Add at least 2 date options to compare" | — |
+| 2 | "Compare (2)" | **enabled** | — |
+| 3 | "Compare (3)" | **enabled** | — |
+| 4 | "Compare (4)" | **enabled** | — |
+| 5 | "Compare (5)" | **enabled** | — |
+| Any (during loading) | "Comparing..." | `disabled`, shows `CircularProgress` (size: 20) as `startIcon` | — |
+
+### 2.5 Clear All Button States
+
+| Queue Count | Visible | Enabled |
+|-------------|---------|---------|
+| 0 | No (hidden) | N/A |
+| 1+ | Yes | Yes |
+| During compare loading | Yes | No (disabled) |
+
+### 2.6 Queue Item Remove Button During Compare Loading
+
+When `comparisonResult.state === 'loading'`, all `IconButton` (close) on queue item cards are **disabled** (the user cannot modify the queue while a comparison is in-flight).
+
+---
+
+## 3. Side-by-Side Comparison Table
+
+**Component**: `ComparisonTable`
+**File**: `src/components/compare/ComparisonTable.tsx`
+**Directive**: `'use client'`
+
+The comparison table is the centerpiece of the results. It uses a **column-per-option** layout where each `TripOption` occupies one column and rows represent metrics.
+
+### 3.1 Table Layout
+
+The table is rendered using MUI `Table` inside a `TableContainer` (component: `Paper`, variant: `outlined`).
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│ TableContainer (component={Paper}, variant="outlined")                     │
+│                                                                            │
+│  Table (stickyHeader, size="medium")                                       │
+│                                                                            │
+│  ┌── TableHead ──────────────────────────────────────────────────────────┐ │
+│  │ TableRow                                                               │ │
+│  │  ┌─────────────┬────────────────┬────────────────┬────────────────┐   │ │
+│  │  │ TableCell   │ TableCell      │ TableCell      │ TableCell      │   │ │
+│  │  │ (sticky)    │                │                │                │   │ │
+│  │  │ width: 140px│ align: center  │ align: center  │ align: center  │   │ │
+│  │  │             │                │                │                │   │ │
+│  │  │ "Metric"    │ "Option 1"     │ "Option 2"     │ "Option 3"     │   │ │
+│  │  │ (text.sec)  │ Chip if tagged │ Chip if tagged │ Chip if tagged │   │ │
+│  │  │             │ "Best Overall" │                │                │   │ │
+│  │  └─────────────┴────────────────┴────────────────┴────────────────┘   │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                            │
+│  ┌── TableBody ──────────────────────────────────────────────────────────┐ │
+│  │                                                                        │ │
+│  │  Row: "Dates"                                                          │ │
+│  │  ┌─────────────┬────────────────┬────────────────┬────────────────┐   │ │
+│  │  │ Dates       │ May 15 – 19   │ May 1 – 5      │ Jun 1 – 5      │   │ │
+│  │  └─────────────┴────────────────┴────────────────┴────────────────┘   │ │
+│  │                                                                        │ │
+│  │  Row: "Destination"                                                    │ │
+│  │  ┌─────────────┬────────────────┬────────────────┬────────────────┐   │ │
+│  │  │ Destination │ Tokyo          │ Tokyo          │ Osaka          │   │ │
+│  │  └─────────────┴────────────────┴────────────────┴────────────────┘   │ │
+│  │                                                                        │ │
+│  │  Row: "Flight (per person)"                                            │ │
+│  │  ┌─────────────┬────────────────┬────────────────┬────────────────┐   │ │
+│  │  │ Flight/pp   │ $289.00        │ $342.50        │ $310.00        │   │ │
+│  │  │             │ (green if min) │                │                │   │ │
+│  │  └─────────────┴────────────────┴────────────────┴────────────────┘   │ │
+│  │                                                                        │ │
+│  │  Row: "Hotel"                                                          │ │
+│  │  ┌─────────────┬────────────────┬────────────────┬────────────────┐   │ │
+│  │  │ Hotel       │ Tokyo Inn      │ Tokyo Inn      │ Grand Hotel    │   │ │
+│  │  └─────────────┴────────────────┴────────────────┴────────────────┘   │ │
+│  │                                                                        │ │
+│  │  Row: "Hotel (total)"                                                  │ │
+│  │  ┌─────────────┬────────────────┬────────────────┬────────────────┐   │ │
+│  │  │ Hotel $     │ $295.00        │ $320.00        │ $350.00        │   │ │
+│  │  │             │ (green if min) │                │                │   │ │
+│  │  └─────────────┴────────────────┴────────────────┴────────────────┘   │ │
+│  │                                                                        │ │
+│  │  Row: "Weather"                                                        │ │
+│  │  ┌─────────────┬────────────────┬────────────────┬────────────────┐   │ │
+│  │  │ Weather     │ Chip "Good"    │ Chip "Great"   │ Chip "Fair"    │   │ │
+│  │  │             │ 68.2/100       │ 82.4/100       │ 55.0/100       │   │ │
+│  │  │             │                │ (bold if max)  │                │   │ │
+│  │  └─────────────┴────────────────┴────────────────┴────────────────┘   │ │
+│  │                                                                        │ │
+│  │  Row: "Total Cost" (highlighted row)                                   │ │
+│  │  ┌─────────────┬────────────────┬────────────────┬────────────────┐   │ │
+│  │  │ Total Cost  │ **$873.00**    │ **$1,005.00**  │ **$970.00**    │   │ │
+│  │  │ (bold label)│ (green if min) │                │                │   │ │
+│  │  └─────────────┴────────────────┴────────────────┴────────────────┘   │ │
+│  │                                                                        │ │
+│  │  Row: "Cost Per Person"                                                │ │
+│  │  ┌─────────────┬────────────────┬────────────────┬────────────────┐   │ │
+│  │  │ Per Person  │ $436.50        │ $502.50        │ $485.00        │   │ │
+│  │  └─────────────┴────────────────┴────────────────┴────────────────┘   │ │
+│  │                                                                        │ │
+│  │  Row: "Overall Score" (highlighted row)                                │ │
+│  │  ┌─────────────┬────────────────┬────────────────┬────────────────┐   │ │
+│  │  │ Score       │ **90.5**       │ **24.7**       │ **52.3**       │   │ │
+│  │  │ (bold label)│ color=primary  │ color=primary  │ color=primary  │   │ │
+│  │  │             │ (bold if max)  │                │                │   │ │
+│  │  └─────────────┴────────────────┴────────────────┴────────────────┘   │ │
+│  │                                                                        │ │
+│  │  Row: "Tags"                                                           │ │
+│  │  ┌─────────────┬────────────────┬────────────────┬────────────────┐   │ │
+│  │  │ Tags        │ Chip "Cheapest"│Chip"Best Wthr" │ —              │   │ │
+│  │  │             │ Chip "Best     │                │                │   │ │
+│  │  │             │  Overall"      │                │                │   │ │
+│  │  └─────────────┴────────────────┴────────────────┴────────────────┘   │ │
+│  │                                                                        │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 3.2 Table Row Definitions
+
+Each row is a `TableRow` containing a label cell (first column) and N data cells (one per option). Options are ordered by `overall_score` descending (as returned by the backend).
+
+| Row # | Label Cell Text | Data Cell Content | Typography Variant | Cell Highlight Rule |
+|-------|----------------|-------------------|-------------------|-------------------|
+| 1 | "Dates" | `dayjs(start_date).format('MMM D') + ' – ' + dayjs(end_date).format('MMM D')` | `body2` | None |
+| 2 | "Destination" | `destination` | `body2` | None |
+| 3 | "Flight (per person)" | `$${flight_price.toFixed(2)}` | `body2` | Green text (`success.main`) on the **lowest** value across options |
+| 4 | "Hotel" | `hotel_name` | `body2` | None |
+| 5 | "Hotel (total)" | `$${hotel_price.toFixed(2)}` | `body2` | Green text (`success.main`) on the **lowest** value across options |
+| 6 | "Weather" | `Chip` with `weather.label` + `Typography` "${weather.weather_score.toFixed(1)}/100" | `body2` | Bold + green text on the **highest** `weather_score` |
+| 7 | **"Total Cost"** | `$${total_trip_cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}` | **`subtitle1` (bold)** | Green text on the **lowest** value. Row background: `grey.50` |
+| 8 | "Per Person" | `$${cost_per_person.toFixed(2)}` | `body2` | None |
+| 9 | **"Overall Score"** | `overall_score.toFixed(1)` | **`subtitle1` (bold)**, `color="primary"` | Bold on the **highest** value. Row background: `grey.50` |
+| 10 | "Tags" | Array of `Chip` components (see §3.3) | — | None |
+
+### 3.3 Tag Chip Rendering
+
+Each tag in the `tags` array is rendered as a MUI `Chip` with:
+
+| Tag Value | Chip Label | Chip Color | Chip Variant | Chip Size |
+|-----------|-----------|------------|-------------|-----------|
+| `"cheapest"` | "Cheapest" | `"success"` | `"filled"` | `"small"` |
+| `"best_weather"` | "Best Weather" | `"info"` | `"filled"` | `"small"` |
+| `"best_overall"` | "Best Overall" | `"warning"` | `"filled"` | `"small"` |
+
+Multiple chips in the same cell are stacked vertically with `gap: 0.5` (4px).
+
+If `tags` is empty for an option, render an em-dash `"—"` in `Typography` variant `body2`, color `text.disabled`.
+
+Use constants from `TAG_COLORS` and `TAG_LABELS` in `frontend/src/types/constants.ts`.
+
+### 3.4 Column Header Rendering
+
+Each option column header cell contains:
+
+1. **Option label**: `Typography` variant `subtitle2`, text: `"Option {index + 1}"` — where index is 0-based position in the sorted array.
+2. **Destination + dates summary**: `Typography` variant `caption`, color `text.secondary`, text: `"{destination}, {dayjs(start_date).format('MMM D')}"`.
+3. **Best Overall badge** (conditional): If the option is at `best_option_index` (index 0 in the sorted results), render a `Chip` with label `"Best Overall"`, color `"warning"`, size `"small"`, variant `"filled"` below the option label.
+
+### 3.5 Best Option Column Highlight
+
+The column corresponding to `best_option_index` (always index 0 since results are sorted by `overall_score` descending) receives a distinct visual treatment:
+
+- **Every data cell** in that column has `bgcolor: 'success.light'` with `alpha: 0.08` (use `sx={{ bgcolor: (theme) => alpha(theme.palette.success.light, 0.08) }}`)
+- Import `alpha` from `@mui/material/styles`
+- The header cell for the best option column also gets this background
+
+### 3.6 Table Loading Skeleton
+
+When `comparisonResult.state === 'loading'`, render a skeleton table:
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│ TableContainer (Paper, variant="outlined")                      │
+│                                                                  │
+│  ┌─ Skeleton row ──────────────────────────────────────────────┐│
+│  │  Skeleton text (w:100px) │ Skeleton rect │ Skeleton rect │  ││
+│  ├─────────────────────────────────────────────────────────────┤│
+│  │  Skeleton text (w:100px) │ Skeleton rect │ Skeleton rect │  ││
+│  ├─────────────────────────────────────────────────────────────┤│
+│  │  Skeleton text (w:100px) │ Skeleton rect │ Skeleton rect │  ││
+│  ├─────────────────────────────────────────────────────────────┤│
+│  │  ... (10 rows total, matching the 10 data rows in §3.2)    ││
+│  └─────────────────────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────┘
+```
+
+- Number of skeleton columns = `queue.length` (the number of items being compared)
+- Each skeleton cell: `Skeleton variant="text"`, width varies (label column: 100px, data columns: 80px)
+- Row height: 48px
+
+---
+
+## 4. Score Summary Cards
+
+**Component**: `ScoreSummaryCards`
+**File**: `src/components/compare/ScoreSummaryCards.tsx`
+**Directive**: `'use client'`
+
+Three cards displayed in a horizontal row, each highlighting one category winner. Rendered only in success state.
+
+### 4.1 Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Grid container (spacing: 3)                                             │
+│                                                                          │
+│  ┌─ Grid item (xs=12, md=4) ──┐ ┌─ Grid item ──┐ ┌─ Grid item ──┐   │
+│  │                              │ │               │ │               │   │
+│  │  Card (variant="outlined")   │ │  Card         │ │  Card         │   │
+│  │                              │ │               │ │               │   │
+│  │  CardContent:                │ │               │ │               │   │
+│  │   EmojiEventsIcon            │ │  AcUnitIcon   │ │  StarIcon     │   │
+│  │   (color="success")          │ │ (color="info")│ │(color="warn") │   │
+│  │                              │ │               │ │               │   │
+│  │   "Cheapest Trip"            │ │"Best Weather" │ │"Best Overall" │   │
+│  │   (variant="subtitle2")     │ │               │ │               │   │
+│  │                              │ │               │ │               │   │
+│  │   "$873.00"                  │ │ "Great (82.4)"│ │ "90.5 / 100"  │   │
+│  │   (variant="h5",            │ │               │ │               │   │
+│  │    color=primary)            │ │               │ │               │   │
+│  │                              │ │               │ │               │   │
+│  │   "Tokyo, May 15–19"        │ │"Tokyo, May1-5"│ │"Tokyo,May15-19│   │
+│  │   (variant="caption",       │ │               │ │               │   │
+│  │    color=text.secondary)     │ │               │ │               │   │
+│  │                              │ │               │ │               │   │
+│  └──────────────────────────────┘ └───────────────┘ └───────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.2 Card Content Mapping
+
+Each card identifies the winning option for one tag category:
+
+| Card | Tag to Find | Icon | Icon Color | Title | Value | Subtitle |
+|------|-------------|------|------------|-------|-------|----------|
+| Cheapest | `"cheapest"` | `EmojiEventsIcon` | `success.main` | "Cheapest Trip" | `$${total_trip_cost.toLocaleString('en-US', {minimumFractionDigits: 2})}` | `{destination}, {dayjs(start_date).format('MMM D')}–{dayjs(end_date).format('MMM D')}` |
+| Best Weather | `"best_weather"` | `WbSunnyIcon` | `info.main` | "Best Weather" | `{weather.label} ({weather.weather_score.toFixed(1)})` | Same subtitle pattern |
+| Best Overall | `"best_overall"` | `StarIcon` | `warning.main` | "Best Overall" | `{overall_score.toFixed(1)} / 100` | Same subtitle pattern |
+
+**Finding the winner for each card**: Iterate through `CompareResponse.options` and find the first option whose `tags` array includes the target tag. If no option has the tag (defensive case — should not happen), hide that card.
+
+### 4.3 Card Styling
+
+- MUI `Card` with `variant="outlined"`
+- `CardContent` with `sx={{ textAlign: 'center', py: 3 }}`
+- Icon rendered above title at `fontSize: 40`
+- Vertical stack: `Box` with `display: flex`, `flexDirection: column`, `alignItems: center`, `gap: 1`
+
+---
+
+## 5. Cost Breakdown Bar Chart
+
+**Component**: `CostBreakdownChart`
+**File**: `src/components/compare/CostBreakdownChart.tsx`
+**Directive**: `'use client'`
+
+A horizontal stacked bar chart showing flight cost vs hotel cost for each option. Implemented using **pure MUI components** (no chart library required).
+
+### 5.1 Layout
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Paper (variant="outlined", sx={{ p: 3 })                        │
+│                                                                  │
+│  Typography: "Cost Breakdown" (variant="h6", mb: 2)             │
+│                                                                  │
+│  ┌─ Stack (spacing: 2) ────────────────────────────────────────┐│
+│  │                                                               ││
+│  │  ┌─ Option row ─────────────────────────────────────────────┐││
+│  │  │ Box (display: flex, alignItems: center, gap: 2)          │││
+│  │  │                                                           │││
+│  │  │  Typography (w: 120px, variant="body2",                  │││
+│  │  │    noWrap, textAlign: right):                             │││
+│  │  │  "Option 1"                                               │││
+│  │  │  + caption: "May 15-19"                                   │││
+│  │  │                                                           │││
+│  │  │  ┌─ Box (flex: 1, display: flex, height: 32px) ────────┐│││
+│  │  │  │                                                       ││││
+│  │  │  │  ┌─ Flight segment ───────┐┌─ Hotel segment ────────┐││││
+│  │  │  │  │ Box (bgcolor:          ││ Box (bgcolor:           │││││
+│  │  │  │  │   primary.main,        ││   primary.light,        │││││
+│  │  │  │  │   width: {flight%},    ││   width: {hotel%},      │││││
+│  │  │  │  │   height: '100%',      ││   height: '100%',       │││││
+│  │  │  │  │   display: flex,       ││   display: flex,        │││││
+│  │  │  │  │   alignItems: center,  ││   alignItems: center,   │││││
+│  │  │  │  │   justifyContent:      ││   justifyContent: ctr,  │││││
+│  │  │  │  │     center)            ││   borderLeft: '1px      │││││
+│  │  │  │  │                        ││     solid white')       │││││
+│  │  │  │  │ Typography (caption,   ││                         │││││
+│  │  │  │  │   color: white):       ││ Typography (caption):   │││││
+│  │  │  │  │ "Flight $578"          ││ "Hotel $295"            │││││
+│  │  │  │  │                        ││                         │││││
+│  │  │  │  └────────────────────────┘└─────────────────────────┘││││
+│  │  │  └───────────────────────────────────────────────────────┘│││
+│  │  │                                                           │││
+│  │  │  Typography (variant="body2", fontWeight: 600, w: 80px): │││
+│  │  │  "$873.00"                                                │││
+│  │  └───────────────────────────────────────────────────────────┘││
+│  │                                                               ││
+│  │  (repeat for each option...)                                  ││
+│  │                                                               ││
+│  └───────────────────────────────────────────────────────────────┘│
+│                                                                  │
+│  ┌─ Legend (Box, display: flex, gap: 3, mt: 2) ─────────────────┐│
+│  │  ● Flight (per person × travelers)   ● Hotel (total)         ││
+│  │  (use small colored Box 12×12 + caption text)                 ││
+│  └───────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Bar Width Calculation
+
+For each option, the bar widths are proportional to cost within that option's total:
+
+```typescript
+const flightTotal = option.flight_price * option.traveler_count;
+const hotelTotal = option.hotel_price;
+const totalCost = option.total_trip_cost;
+
+const flightPercent = (flightTotal / totalCost) * 100; // as CSS width percentage
+const hotelPercent = (hotelTotal / totalCost) * 100;
+```
+
+The **overall bar width** is scaled relative to the most expensive option across all options:
+
+```typescript
+const maxCost = Math.max(...options.map(o => o.total_trip_cost));
+
+// Each option's bar container width is proportional to maxCost
+const barWidthPercent = (option.total_trip_cost / maxCost) * 100;
+```
+
+Implementation: The outer bar `Box` has `width: '${barWidthPercent}%'` of the available flex space. Inside, flight and hotel segments are `width: '${flightPercent}%'` and `width: '${hotelPercent}%'` respectively.
+
+### 5.3 Segment Label Visibility
+
+If a segment is too narrow (< 15% of the bar), hide the text label inside it to avoid overflow. The total cost label on the right always shows.
+
+```typescript
+const showFlightLabel = flightPercent >= 15;
+const showHotelLabel = hotelPercent >= 15;
+```
+
+### 5.4 Colors
+
+| Segment | Background Color | Text Color |
+|---------|-----------------|------------|
+| Flight | `primary.main` | `primary.contrastText` (white) |
+| Hotel | `primary.light` | `primary.contrastText` or `text.primary` (whichever has better contrast — use `primary.dark` text if `primary.light` is too light) |
+
+### 5.5 Bar Border Radius
+
+The overall bar container has `borderRadius: 1` (4px). The first segment (flight) gets `borderRadius: '4px 0 0 4px'`. The last segment (hotel) gets `borderRadius: '0 4px 4px 0'`.
+
+---
+
+## 6. Score Comparison Bar Chart
+
+**Component**: `ScoreComparisonChart`
+**File**: `src/components/compare/ScoreComparisonChart.tsx`
+**Directive**: `'use client'`
+
+A horizontal bar chart showing the overall score breakdown (cost component vs weather component) for each option.
+
+### 6.1 Layout
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Paper (variant="outlined", sx={{ p: 3 })                        │
+│                                                                  │
+│  Typography: "Score Breakdown" (variant="h6", mb: 2)            │
+│  Typography: "Overall = 70% Cost + 30% Weather"                 │
+│    (variant="caption", color="text.secondary", mb: 2)           │
+│                                                                  │
+│  ┌─ Stack (spacing: 2) ────────────────────────────────────────┐│
+│  │                                                               ││
+│  │  ┌─ Option row ─────────────────────────────────────────────┐││
+│  │  │ Box (display: flex, alignItems: center, gap: 2)          │││
+│  │  │                                                           │││
+│  │  │  Typography (w: 120px):                                   │││
+│  │  │  "Option 1"                                               │││
+│  │  │                                                           │││
+│  │  │  ┌─ Box (flex: 1, height: 32px) ───────────────────────┐│││
+│  │  │  │                                                       ││││
+│  │  │  │  ┌─ Cost component ──┐┌─ Weather component ─────────┐││││
+│  │  │  │  │ width proportional││ width proportional            │││││
+│  │  │  │  │ to cost_score     ││ to weather contribution      │││││
+│  │  │  │  │ contribution      ││                               │││││
+│  │  │  │  │ (0.7 * cost_score)││ (0.3 * weather_score)        │││││
+│  │  │  │  │ bgcolor:          ││ bgcolor:                      │││││
+│  │  │  │  │   success.main    ││   info.main                  │││││
+│  │  │  │  └───────────────────┘└──────────────────────────────┘││││
+│  │  │  └───────────────────────────────────────────────────────┘│││
+│  │  │                                                           │││
+│  │  │  Typography (w: 60px, fontWeight: 600):                   │││
+│  │  │  "90.5"                                                   │││
+│  │  └───────────────────────────────────────────────────────────┘││
+│  │                                                               ││
+│  │  (repeat for each option...)                                  ││
+│  └───────────────────────────────────────────────────────────────┘│
+│                                                                  │
+│  ┌─ Legend ──────────────────────────────────────────────────────┐│
+│  │  ● Cost Score (70%)    ● Weather Score (30%)                  ││
+│  └───────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 6.2 Bar Width Calculation
+
+The score bars represent the overall_score on a 0–100 scale:
+
+```typescript
+// Each bar's total width as percentage of 100
+const barWidthPercent = option.overall_score; // 0–100, maps directly to percentage
+
+// The cost and weather component widths WITHIN the bar:
+// NOTE: We don't have the raw cost_score from the API. We can derive the visual split:
+// overall_score = 0.7 * cost_score + 0.3 * weather_score
+// cost_contribution = 0.7 * cost_score (unknown)
+// weather_contribution = 0.3 * weather_score (known)
+//
+// Since cost_score is NOT returned by the API, we approximate the visual split:
+const weatherContribution = 0.3 * option.weather.weather_score;
+const costContribution = option.overall_score - weatherContribution;
+
+// Within the bar, the split is:
+const costPercent = (costContribution / option.overall_score) * 100;
+const weatherPercent = (weatherContribution / option.overall_score) * 100;
+```
+
+**Edge case**: If `overall_score === 0`, render an empty bar (width 0%). No segments.
+
+### 6.3 Colors
+
+| Segment | Background Color | Text Color |
+|---------|-----------------|------------|
+| Cost component | `success.main` | white |
+| Weather component | `info.main` | white |
+
+---
+
+## 7. Winner Banner
+
+**Component**: `WinnerBanner`
+**File**: `src/components/compare/WinnerBanner.tsx`
+**Directive**: `'use client'`
+
+A prominent banner at the top of Zone B highlighting the overall winner.
+
+### 7.1 Layout
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Alert (severity="success", variant="filled",                     │
+│   icon={EmojiEventsIcon},                                        │
+│   sx={{ '& .MuiAlert-message': { width: '100%' } }})           │
+│                                                                  │
+│  Box (display: flex, justifyContent: space-between,              │
+│       alignItems: center, width: '100%')                         │
+│                                                                  │
+│    Box (left side):                                              │
+│      AlertTitle: "Best Overall Option"                           │
+│      Typography (variant="body1"):                               │
+│        "{destination} · {dayjs(start_date).format('MMM D')} –   │
+│          {dayjs(end_date).format('MMM D, YYYY')}"               │
+│                                                                  │
+│    Box (right side):                                             │
+│      Typography (variant="h4", fontWeight: 700):                │
+│        "{overall_score.toFixed(1)}"                              │
+│      Typography (variant="caption"):                             │
+│        "/ 100"                                                   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 7.2 Data Source
+
+The banner displays data from `CompareResponse.options[best_option_index]`.
+
+---
+
+## 8. Responsive Column Behavior
+
+Since this is desktop-first with no mobile-specific layouts, the following rules ensure the table remains usable at various desktop widths:
+
+### 8.1 Comparison Table
+
+- `TableContainer` has `sx={{ overflowX: 'auto' }}` — horizontal scroll if columns exceed container width
+- Minimum column width for data columns: `150px`
+- Label column: fixed `width: 160px`
+- With 5 options: total table min-width = 160 + (5 × 150) = 910px — fits within the 1200px container
+
+### 8.2 Charts Side-by-Side Layout
+
+The two charts (Cost Breakdown and Score Comparison) are placed in a `Grid` container:
+
+```
+Grid container (spacing: 3)
+├── Grid item (xs=12, md=6) → CostBreakdownChart
+└── Grid item (xs=12, md=6) → ScoreComparisonChart
+```
+
+At widths below the `md` breakpoint (900px), charts stack vertically. This is acceptable desktop behavior for smaller/resized windows.
+
+### 8.3 Queue Item Cards Grid
+
+Queue items use `Grid` with responsive columns:
+
+```
+Grid container (spacing: 2)
+├── Grid item (xs=12, sm=6, md=4) per queue item
+└── Grid item (xs=12, sm=6, md=4) per empty slot
+```
+
+With 5 items at `md`: 3 + 2 on two rows.
+
+---
+
+## 9. Component File Structure
+
+```
+frontend/src/components/compare/
+├── ComparisonSection.tsx          # Top-level orchestrator (Zone A + Zone B)
+├── ComparisonQueuePanel.tsx       # Queue management (Zone A)
+├── QueueItemCard.tsx              # Individual queue item card
+├── WinnerBanner.tsx               # Best option banner
+├── ScoreSummaryCards.tsx          # Three summary cards row
+├── ComparisonTable.tsx            # Side-by-side data table
+├── ComparisonTableSkeleton.tsx   # Loading skeleton for comparison table
+├── CostBreakdownChart.tsx         # Stacked horizontal bar chart (costs)
+└── ScoreComparisonChart.tsx       # Stacked horizontal bar chart (scores)
+```
+
+All files use `'use client'` directive.
+
+---
+
+## 10. Component Signatures
+
+### 10.1 ComparisonSection
+
+```typescript
+// src/components/compare/ComparisonSection.tsx
+'use client';
+
+/**
+ * Top-level orchestrator for the Compare section.
+ * Reads queue and comparison state from ComparisonQueueContext.
+ * No props — all data comes from context.
+ */
+export default function ComparisonSection(): JSX.Element;
+```
+
+**Internal logic**:
+- Reads `{ queue, removeItem, clearQueue, isFull, count, comparisonResult, compareTrips, resetComparison }` from `useComparisonQueue()`
+- Always renders `ComparisonQueuePanel`
+- Conditionally renders Zone B components based on `comparisonResult.state`:
+  - `'idle'`: Zone B not rendered
+  - `'loading'`: Renders loading skeleton for table area
+  - `'error'`: Renders `InlineError` with retry calling `compareTrips()`
+  - `'success'`: Renders `WinnerBanner` + `ScoreSummaryCards` + `ComparisonTable` + charts row
+
+**Render structure**:
+
+```tsx
+<Box>
+  <ComparisonQueuePanel
+    queue={queue}
+    onRemoveItem={removeItem}
+    onClearAll={clearQueue}
+    onCompare={compareTrips}
+    isComparing={comparisonResult.state === 'loading'}
+    compareDisabled={count < MIN_COMPARE_SIZE}
+  />
+
+  {/* Zone B: Results */}
+  {comparisonResult.state === 'loading' && (
+    <Box sx={{ mt: 4 }}>
+      {/* Skeleton table: queue.length columns, 10 rows */}
+      <ComparisonTableSkeleton columnCount={count} />
+    </Box>
+  )}
+
+  {comparisonResult.state === 'error' && (
+    <Box sx={{ mt: 4 }}>
+      <InlineError
+        message={comparisonResult.error!}
+        onRetry={compareTrips}
+      />
+    </Box>
+  )}
+
+  {comparisonResult.state === 'success' && comparisonResult.data && (
+    <Box sx={{ mt: 4 }}>
+      <Stack spacing={4}>
+        <WinnerBanner option={comparisonResult.data.options[comparisonResult.data.best_option_index]} />
+        <ScoreSummaryCards options={comparisonResult.data.options} />
+        <ComparisonTable options={comparisonResult.data.options} bestOptionIndex={comparisonResult.data.best_option_index} />
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <CostBreakdownChart options={comparisonResult.data.options} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <ScoreComparisonChart options={comparisonResult.data.options} />
+          </Grid>
+        </Grid>
+      </Stack>
+    </Box>
+  )}
+</Box>
+```
+
+### 10.2 ComparisonQueuePanel
+
+```typescript
+// src/components/compare/ComparisonQueuePanel.tsx
+
+interface ComparisonQueuePanelProps {
+  /** Current items in the comparison queue */
+  queue: ComparisonQueueItem[];
+  /** Callback to remove an item by its id */
+  onRemoveItem: (id: string) => void;
+  /** Callback to clear all items from the queue */
+  onClearAll: () => void;
+  /** Callback to trigger comparison */
+  onCompare: () => void;
+  /** Whether a comparison request is currently in-flight */
+  isComparing: boolean;
+  /** Whether the Compare button should be disabled (queue < 2 items) */
+  compareDisabled: boolean;
+}
+
+export default function ComparisonQueuePanel(props: ComparisonQueuePanelProps): JSX.Element;
+```
+
+### 10.3 QueueItemCard
+
+```typescript
+// src/components/compare/QueueItemCard.tsx
+
+interface QueueItemCardProps {
+  /** The queue item data to display */
+  item: ComparisonQueueItem;
+  /** Callback to remove this item */
+  onRemove: () => void;
+  /** Whether the remove button is disabled (during comparison loading) */
+  removeDisabled: boolean;
+}
+
+export default function QueueItemCard(props: QueueItemCardProps): JSX.Element;
+```
+
+### 10.4 WinnerBanner
+
+```typescript
+// src/components/compare/WinnerBanner.tsx
+
+import type { TripOption } from '@/types/api';
+
+interface WinnerBannerProps {
+  /** The best overall trip option */
+  option: TripOption;
+}
+
+export default function WinnerBanner(props: WinnerBannerProps): JSX.Element;
+```
+
+### 10.5 ScoreSummaryCards
+
+```typescript
+// src/components/compare/ScoreSummaryCards.tsx
+
+import type { TripOption } from '@/types/api';
+
+interface ScoreSummaryCardsProps {
+  /** All scored options (used to find tagged winners) */
+  options: TripOption[];
+}
+
+export default function ScoreSummaryCards(props: ScoreSummaryCardsProps): JSX.Element;
+```
+
+### 10.6 ComparisonTable
+
+```typescript
+// src/components/compare/ComparisonTable.tsx
+
+import type { TripOption } from '@/types/api';
+
+interface ComparisonTableProps {
+  /** Scored options sorted by overall_score descending */
+  options: TripOption[];
+  /** Index of the best option in the options array (always 0) */
+  bestOptionIndex: number;
+}
+
+export default function ComparisonTable(props: ComparisonTableProps): JSX.Element;
+```
+
+### 10.7 CostBreakdownChart
+
+```typescript
+// src/components/compare/CostBreakdownChart.tsx
+
+import type { TripOption } from '@/types/api';
+
+interface CostBreakdownChartProps {
+  /** Scored options to chart */
+  options: TripOption[];
+}
+
+export default function CostBreakdownChart(props: CostBreakdownChartProps): JSX.Element;
+```
+
+### 10.8 ScoreComparisonChart
+
+```typescript
+// src/components/compare/ScoreComparisonChart.tsx
+
+import type { TripOption } from '@/types/api';
+
+interface ScoreComparisonChartProps {
+  /** Scored options to chart */
+  options: TripOption[];
+}
+
+export default function ScoreComparisonChart(props: ScoreComparisonChartProps): JSX.Element;
+```
+
+### 10.9 ComparisonTableSkeleton
+
+```typescript
+// src/components/compare/ComparisonTableSkeleton.tsx
+'use client';
+
+interface ComparisonTableSkeletonProps {
+  /** Number of data columns to render (equals queue.length, i.e. the number of items being compared) */
+  columnCount: number;
+}
+
+export default function ComparisonTableSkeleton(props: ComparisonTableSkeletonProps): JSX.Element;
+```
+
+**Rendering behavior**:
+- Uses MUI `TableContainer` (component: `Paper`, variant: `outlined`) wrapping a `Table`.
+- **Header row**: One `Skeleton` (variant: `text`, width: 100px) in the label column, then `columnCount` `Skeleton` cells (variant: `text`, width: 80px, align: center).
+- **Body rows**: 10 rows (matching the 10 data rows defined in §3.2). Each row has one label-column `Skeleton` (variant: `text`, width: `100px`) and `columnCount` data-cell `Skeleton` elements (variant: `text`, width: `80px`).
+- Row height: 48px (via `sx={{ height: 48 }}` on each `TableRow`).
+- All `Skeleton` elements use `animation="wave"`.
+
+### 10.10 InlineError (cross-reference)
+
+The Compare section uses the shared `InlineError` component when `comparisonResult.state === 'error'`. This component is defined in `src/components/shared/InlineError.tsx` and fully specified in `docs/frontend/frontend-spec-ui-states.md`. It renders a MUI `Alert` (severity: `error`) containing the error message text and a "Retry" `Button` (variant: `outlined`, color: `error`). The `onRetry` callback is wired to `compareTrips()` from the ComparisonQueueContext.
+
+---
+
+## 11. State Management & Data Flow
+
+### 11.1 Data Source
+
+All comparison data comes from `ComparisonQueueContext` via the `useComparisonQueue()` hook:
+
+```
+useComparisonQueue()
+├── queue: ComparisonQueueItem[]          → feeds ComparisonQueuePanel
+├── comparisonResult.state: LoadingState  → controls Zone B visibility
+├── comparisonResult.data: CompareResponse → feeds all Zone B components
+├── comparisonResult.error: string | null → feeds InlineError
+├── compareTrips: () => Promise<void>     → triggered by Compare button
+├── removeItem: (id) => void             → triggered by QueueItemCard close button
+├── clearQueue: () => void               → triggered by Clear All button
+└── resetComparison: () => void          → called automatically when queue changes
+```
+
+### 11.2 State Transitions Within ComparisonSection
+
+```
+Queue has 0 items:
+  → Section not visible (SectionContainer visible={false})
+
+Queue has 1 item:
+  → Zone A visible, Compare button disabled
+  → Zone B hidden (idle)
+
+Queue has 2-5 items:
+  → Zone A visible, Compare button enabled
+  → Zone B hidden (idle) until user clicks Compare
+
+User clicks Compare:
+  → compareTrips() called
+  → comparisonResult.state transitions: idle → loading → success|error
+  → Zone B renders accordingly
+
+User removes/adds queue item after success:
+  → resetComparison() called automatically by context
+  → comparisonResult resets to idle
+  → Zone B disappears
+  → User must click Compare again
+
+User clicks Clear All:
+  → clearQueue() called
+  → All items removed
+  → resetComparison() called
+  → Section may become invisible if count drops to 0
+```
+
+### 11.3 Queue Modification → Comparison Reset Rule
+
+**Critical behavior**: Any mutation to the queue (`addItem`, `removeItem`, `clearQueue`) after a successful comparison **must** call `resetComparison()`. This is handled inside the `ComparisonQueueContext` provider — not in the component. The component simply renders based on `comparisonResult.state`.
+
+Rationale: Comparison scores are relative (cost_score uses linear interpolation across all options). Changing the set of options invalidates all scores.
+
+---
+
+## 12. Edge Cases & Boundary Conditions
+
+### 12.1 Queue Capacity
+
+| Scenario | Behavior |
+|----------|----------|
+| Queue has 0 items | Section hidden (SectionContainer `visible={false}`) |
+| Queue has 1 item | Zone A shows 1 card + 4 empty slots. Compare button disabled with tooltip: "Add at least 2 date options to compare" |
+| Queue has 5 items (full) | Zone A shows 5 cards, 0 empty slots. "Add to Queue" button in DateOptionBuilderSection is disabled with tooltip: "Comparison queue is full (max 5)" |
+| Queue has 5 items + user tries to add | `addItem()` returns `false`. No item added. |
+
+### 12.2 Duplicate Detection
+
+| Scenario | Behavior |
+|----------|----------|
+| User tries to add item with same destination + dates | `addItem()` returns `false`. The "Add to Queue" button in DateOptionBuilderSection shows tooltip: "This date range is already in your queue" |
+| Same destination, different dates | Allowed — different `id` |
+| Different destination, same dates | Allowed — different `id` |
+| Same dates, different hotel selection | Rejected — same `id` (destination-startDate-endDate). Users should compare different date ranges, not different hotels. |
+
+### 12.3 API Errors
+
+| Scenario | Behavior |
+|----------|----------|
+| POST /api/v1/compare returns 422 | `InlineError` with backend's validation message (e.g., "At least 2 options are required for comparison"). User can modify queue and retry. |
+| POST /api/v1/compare returns 400 | `InlineError` with backend message. Retry button re-sends same request. |
+| POST /api/v1/compare returns 500 | `InlineError` with "Something went wrong on our end. Please try again." |
+| Network error / timeout | `InlineError` with "Network error. Please check your connection and try again." or "Request timed out. Please try again." |
+| Response `options` is empty array | Defensive: treated as error. `InlineError` with "Comparison returned no results. Please try again." |
+
+### 12.4 Comparison Table Edge Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| 2 options compared | Table has 3 columns: 1 label + 2 data. Charts show 2 bars each. |
+| 5 options compared | Table has 6 columns: 1 label + 5 data. Horizontal scroll if needed. Charts show 5 bars each. |
+| All options have same total_trip_cost | No green highlight on Total Cost row (all equal, no "lowest"). `cost_score` = 100 for all. |
+| All options have same weather_score | No bold highlight on Weather row. All get `best_weather` tag. |
+| One option has multiple tags | Tags cell shows multiple `Chip` components stacked vertically. |
+| Option has zero tags | Tags cell shows em-dash `"—"` in disabled text color. |
+| `weather.weather_score` is 0 | Score displays "0.0/100". Weather Chip shows "Poor". Bar chart shows zero-width weather segment. |
+| `overall_score` is 0 for an option | Score displays "0.0". Score bar chart renders zero-width bar. |
+
+### 12.5 Chart Edge Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| `flight_price` is 0 (e.g., free flight) | Cost chart: flight segment width = 0%, only hotel segment visible. Total shows hotel price only. |
+| `hotel_price` is 0 | Cost chart: hotel segment width = 0%, only flight segment visible. |
+| All options have same cost | Cost chart: all bars same width. |
+| `overall_score` is very small (e.g., 2.3) | Score chart: very short bar. Score label still displayed outside the bar. |
+| Only 2 options | Charts show 2 bars each. Summary cards show 3 cards (one option may win multiple categories). |
+
+### 12.6 Summary Cards Edge Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| One option wins all three tags | All three summary cards reference the same option with different highlight values. |
+| A tag is missing from all options | Hide that summary card. (Defensive — the backend always assigns all three tags.) |
+| Two options tie for cheapest | Backend assigns `cheapest` to only one. Frontend displays whichever the backend tagged. |
+
+---
+
+## Appendix A: MUI Icon Imports
+
+| Icon | Import Path | Used By |
+|------|------------|---------|
+| `CompareArrowsIcon` | `@mui/icons-material/CompareArrows` | Compare button |
+| `CloseIcon` | `@mui/icons-material/Close` | QueueItemCard remove button |
+| `DeleteOutlineIcon` | `@mui/icons-material/DeleteOutline` | Clear All button |
+| `EmojiEventsIcon` | `@mui/icons-material/EmojiEvents` | WinnerBanner, Cheapest summary card |
+| `WbSunnyIcon` | `@mui/icons-material/WbSunny` | Best Weather summary card |
+| `StarIcon` | `@mui/icons-material/Star` | Best Overall summary card |
+
+## Appendix B: Color Reference
+
+| Usage | MUI Token | Hex (default MUI theme) |
+|-------|-----------|------------------------|
+| Best option column bg | `alpha(success.light, 0.08)` | ~rgba(76, 175, 80, 0.08) |
+| Highlighted row bg | `grey.50` | #fafafa |
+| Flight bar segment | `primary.main` | #1976d2 |
+| Hotel bar segment | `primary.light` | #42a5f5 |
+| Cost score segment | `success.main` | #2e7d32 |
+| Weather score segment | `info.main` | #0288d1 |
+| Cheapest chip | `success` color | MUI success palette |
+| Best Weather chip | `info` color | MUI info palette |
+| Best Overall chip | `warning` color | MUI warning palette |
+| Winner banner | `success` severity (filled) | MUI success palette |
+| Empty slot border | `divider` | rgba(0,0,0,0.12) |
+
+## Appendix C: dayjs Format Patterns Used
+
+| Pattern | Example Output | Used For |
+|---------|---------------|----------|
+| `'MMM D'` | "May 1" | Table date cells, chart labels |
+| `'MMM D, YYYY'` | "May 1, 2026" | Queue item card date range (end date) |
+| `'MMM D'` + `' – '` + `'MMM D'` | "May 1 – May 5" | Table Dates row |
+| `'MMM D'` + `'–'` + `'MMM D'` | "May 1–May 5" | Summary card subtitles (compact) |
