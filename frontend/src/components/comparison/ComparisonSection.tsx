@@ -3,6 +3,7 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
+import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import Tooltip from '@mui/material/Tooltip';
@@ -32,6 +33,7 @@ export function ComparisonSection() {
     resetComparison,
   } = useComparisonQueue();
 
+  const isLoading = comparisonResult.state === 'loading';
   const canCompare = count >= MIN_COMPARE_SIZE;
 
   const compareTooltip = canCompare
@@ -70,29 +72,32 @@ export function ComparisonSection() {
       {/* Queue Items */}
       {count > 0 && (
         <Box sx={{ mb: 3 }}>
-          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+          <Grid container spacing={2} sx={{ mb: 2 }}>
             {queue.map((item) => (
-              <QueueItemCard key={item.id} item={item} onRemove={removeItem} />
+              <Grid key={item.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                <QueueItemCard item={item} onRemove={removeItem} disabled={isLoading} />
+              </Grid>
             ))}
             {count < MAX_QUEUE_SIZE && (
-              <Box
-                sx={{
-                  minWidth: 200,
-                  height: 130,
-                  border: '2px dashed',
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  Add more options above
-                </Typography>
-              </Box>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Box
+                  sx={{
+                    minHeight: 160,
+                    border: '2px dashed',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    Add more options above
+                  </Typography>
+                </Box>
+              </Grid>
             )}
-          </Stack>
+          </Grid>
 
           {/* Sub-minimum alert */}
           {count === 1 && (
@@ -108,7 +113,7 @@ export function ComparisonSection() {
               size="small"
               startIcon={<DeleteSweepIcon />}
               onClick={clearQueue}
-              disabled={count === 0}
+              disabled={isLoading}
             >
               Clear All
             </Button>
@@ -120,9 +125,9 @@ export function ComparisonSection() {
                   size="large"
                   startIcon={<CompareArrowsIcon />}
                   onClick={compareTrips}
-                  disabled={!canCompare || comparisonResult.state === 'loading'}
+                  disabled={!canCompare || isLoading}
                 >
-                  {comparisonResult.state === 'loading' ? (
+                  {isLoading ? (
                     <>
                       <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
                       Comparing...
