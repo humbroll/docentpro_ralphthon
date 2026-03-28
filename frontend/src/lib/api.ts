@@ -69,6 +69,14 @@ export async function searchDestinations(query: string, signal?: AbortSignal): P
   return response.data;
 }
 
+export async function geocodeCity(city: string, country: string, iataCode: string): Promise<DestinationResult> {
+  const response = await apiClient.get<DestinationResult>(
+    '/api/v1/search/geocode',
+    { params: { city, country, iata_code: iataCode } },
+  );
+  return response.data;
+}
+
 export async function getFlightPrice(request: FlightPriceRequest): Promise<FlightPrice> {
   const response = await apiClient.post<FlightPrice>('/api/v1/flights/price', request);
   return response.data;

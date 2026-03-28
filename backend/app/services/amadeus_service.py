@@ -5,7 +5,6 @@ from datetime import date
 
 import airportsdata
 from amadeus import Client
-from geopy.geocoders import Nominatim
 
 from app.api.v1.schemas import DestinationResult, FlightPrice
 from app.core.config import settings
@@ -14,39 +13,84 @@ logger = logging.getLogger(__name__)
 
 _client: Client | None = None
 _airports: dict | None = None
-_geocoder: Nominatim | None = None
-_city_coord_cache: dict[str, tuple[float, float]] = {}
 
-
-def _get_geocoder() -> Nominatim:
-    global _geocoder
-    if _geocoder is None:
-        _geocoder = Nominatim(user_agent="whentogo")
-    return _geocoder
+# City center coordinates for major cities.
+# Airports are often 30-60km from city centers, causing
+# hotel searches to fail. This map provides accurate
+# city-center coords without external API calls.
+_CITY_CENTER_COORDS: dict[str, tuple[float, float]] = {
+    "Seoul_KR": (37.5667, 126.9783),
+    "Tokyo_JP": (35.6769, 139.7639),
+    "New York_US": (40.7128, -74.0060),
+    "London_GB": (51.5074, -0.1278),
+    "Paris_FR": (48.8566, 2.3522),
+    "Barcelona_ES": (41.3874, 2.1686),
+    "Madrid_ES": (40.4168, -3.7038),
+    "Rome_IT": (41.9028, 12.4964),
+    "Berlin_DE": (52.5200, 13.4050),
+    "Amsterdam_NL": (52.3676, 4.9041),
+    "Bangkok_TH": (13.7563, 100.5018),
+    "Singapore_SG": (1.3521, 103.8198),
+    "Dubai_AE": (25.2048, 55.2708),
+    "Sydney_AU": (33.8688, 151.2093),
+    "Melbourne_AU": (-37.8136, 144.9631),
+    "Los Angeles_US": (34.0522, -118.2437),
+    "San Francisco_US": (37.7749, -122.4194),
+    "Chicago_US": (41.8781, -87.6298),
+    "Miami_US": (25.7617, -80.1918),
+    "Toronto_CA": (43.6532, -79.3832),
+    "Vancouver_CA": (49.2827, -123.1207),
+    "Hong Kong_HK": (22.3193, 114.1694),
+    "Shanghai_CN": (31.2304, 121.4737),
+    "Beijing_CN": (39.9042, 116.4074),
+    "Delhi_IN": (28.6139, 77.2090),
+    "Mumbai_IN": (19.0760, 72.8777),
+    "Istanbul_TR": (41.0082, 28.9784),
+    "Cairo_EG": (30.0444, 31.2357),
+    "Mexico City_MX": (19.4326, -99.1332),
+    "São Paulo_BR": (-23.5505, -46.6333),
+    "Buenos Aires_AR": (-34.6037, -58.3816),
+    "Osaka_JP": (34.6937, 135.5023),
+    "Taipei_TW": (25.0330, 121.5654),
+    "Kuala Lumpur_MY": (3.1390, 101.6869),
+    "Jakarta_ID": (-6.2088, 106.8456),
+    "Lisbon_PT": (38.7223, -9.1393),
+    "Munich_DE": (48.1351, 11.5820),
+    "Zurich_CH": (47.3769, 8.5417),
+    "Vienna_AT": (48.2082, 16.3738),
+    "Prague_CZ": (50.0755, 14.4378),
+    "Athens_GR": (37.9838, 23.7275),
+    "Moscow_RU": (55.7558, 37.6173),
+    "Honolulu_US": (21.3069, -157.8583),
+    "Denver_US": (39.7392, -104.9903),
+    "Seattle_US": (47.6062, -122.3321),
+    "Boston_US": (42.3601, -71.0589),
+    "Dallas_US": (32.7767, -96.7970),
+    "Houston_US": (29.7604, -95.3698),
+    "Atlanta_US": (33.7490, -84.3880),
+    "Washington_US": (38.9072, -77.0369),
+    "Philadelphia_US": (39.9526, -75.1652),
+    "Phoenix_US": (33.4484, -112.0740),
+    "Hanoi_VN": (21.0278, 105.8342),
+    "Ho Chi Minh City_VN": (10.8231, 106.6297),
+    "Manila_PH": (14.5995, 120.9842),
+    "Nairobi_KE": (-1.2921, 36.8219),
+    "Cape Town_ZA": (-33.9249, 18.4241),
+    "Doha_QA": (25.2854, 51.5310),
+    "Riyadh_SA": (24.7136, 46.6753),
+}
 
 
 def _get_city_coords(
-    city: str, country: str, fallback_lat: float, fallback_lon: float
+    city: str,
+    country: str,
+    fallback_lat: float,
+    fallback_lon: float,
 ) -> tuple[float, float]:
-    """Get city center coords via geocoding, with cache."""
+    """Get city center coords from static map, with fallback."""
     key = f"{city}_{country}"
-    if key in _city_coord_cache:
-        return _city_coord_cache[key]
-    try:
-        geo = _get_geocoder()
-        query = f"{city}, {country}" if country else city
-        loc = geo.geocode(query, timeout=5)
-        if loc:
-            coords = (loc.latitude, loc.longitude)
-            _city_coord_cache[key] = coords
-            logger.info(
-                "Geocoded %s → (%.4f, %.4f)",
-                query, coords[0], coords[1],
-            )
-            return coords
-    except Exception as e:
-        logger.warning("Geocode failed for %s: %s", city, e)
-    _city_coord_cache[key] = (fallback_lat, fallback_lon)
+    if key in _CITY_CENTER_COORDS:
+        return _CITY_CENTER_COORDS[key]
     return (fallback_lat, fallback_lon)
 
 
@@ -99,6 +143,22 @@ def _airport_priority(iata: str, name: str) -> int:
     return 2
 
 
+def geocode_city(
+    city: str, country: str = "", iata_code: str = ""
+) -> DestinationResult | None:
+    """Geocode a city to get accurate center coordinates."""
+    lat, lon = _get_city_coords(city, country, 0.0, 0.0)
+    if lat == 0.0 and lon == 0.0:
+        return None
+    return DestinationResult(
+        name=city,
+        latitude=lat,
+        longitude=lon,
+        country=country or lookup_country_code(city),
+        iata_code=iata_code or None,
+    )
+
+
 def lookup_country_code(city_name: str) -> str:
     """Find country code for a city from airportsdata."""
     airports = _get_airports()
@@ -143,7 +203,7 @@ def search_cities(
         _, iata, info = aps[0]
         city_name = info.get("city", "")
         country = info.get("country", "")
-        # Use city center coords instead of airport coords
+        # Use city center coords when available
         lat, lon = _get_city_coords(
             city_name,
             country,

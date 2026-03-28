@@ -20,7 +20,7 @@ import { ComparisonSection } from '@/components/comparison/ComparisonSection';
 import { SectionContainer } from '@/components/layout/SectionContainer';
 import { WEATHER_LABEL_COLORS } from '@/types/constants';
 import { useComparisonQueue } from '@/context/ComparisonQueueContext';
-import { getFlightPrice, searchHotels, getWeather, extractApiError } from '@/lib/api';
+import { getFlightPrice, searchHotels, getWeather, geocodeCity, extractApiError } from '@/lib/api';
 import type { DestinationResult, HotelOption } from '@/types/api';
 import type {
   SelectedDestination,
@@ -56,22 +56,43 @@ export default function HomePage() {
   const showComparison = queueCount >= 1;
 
   // ── Handlers ──
-  const handleDestinationChange = (dest: DestinationResult | null) => {
-    if (dest) {
-      setSelectedDestination({
-        name: dest.name,
-        latitude: dest.latitude,
-        longitude: dest.longitude,
-        country: dest.country,
-        iata_code: dest.iata_code,
-      });
-    } else {
-      setSelectedDestination(null);
-    }
+  const handleDestinationChange = async (dest: DestinationResult | null) => {
     // Cascading reset
     setDateRange(null);
     setDateDetailResults(INITIAL_DETAIL_RESULTS);
     setSelectedHotel(null);
+
+    if (!dest) {
+      setSelectedDestination(null);
+      return;
+    }
+
+    // Set immediately with airport coords for fast UI
+    setSelectedDestination({
+      name: dest.name,
+      latitude: dest.latitude,
+      longitude: dest.longitude,
+      country: dest.country,
+      iata_code: dest.iata_code,
+    });
+
+    // Geocode to get accurate city center coords
+    try {
+      const geocoded = await geocodeCity(
+        dest.name,
+        dest.country,
+        dest.iata_code ?? '',
+      );
+      setSelectedDestination({
+        name: geocoded.name,
+        latitude: geocoded.latitude,
+        longitude: geocoded.longitude,
+        country: geocoded.country,
+        iata_code: geocoded.iata_code ?? dest.iata_code,
+      });
+    } catch {
+      // Keep airport coords as fallback
+    }
   };
 
   const handleDateRangeConfirm = useCallback((range: DateRange) => {
