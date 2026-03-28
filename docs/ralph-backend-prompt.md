@@ -118,173 +118,18 @@ After completing Phase 3:
 
 ### Phase 4: Self-Verification
 
-Run ALL curl commands from Section 8. Fix any failures. Update `backend/PROGRESS.md` with results.
+Read `docs/api-spec.yaml`, derive curl test commands from the spec's example payloads, and test every endpoint. Fix any failures. Update `backend/PROGRESS.md` with results.
 
 ---
 
-## 4. Endpoint Implementation Details
+## 4. Implementation Guide
 
-All endpoints are defined in `docs/api-spec.yaml`. Here is a summary with implementation guidance.
+### Read the spec first
+`docs/api-spec.yaml` contains **everything** you need: all endpoints, request/response schemas, error formats, scoring formulas, and example payloads. Read it thoroughly before writing any code.
 
-### 4.1 GET /api/v1/search/destinations?q={query}
+### External API SDK Usage
 
-**Purpose**: City search autocomplete.
-
-**Implementation**:
-- Use the `amadeus` Python package (already installed) for city search
-- Initialize the Amadeus client with `settings.AMADEUS_API_KEY` and `settings.AMADEUS_API_SECRET`
-- Use Amadeus Reference Data API: `amadeus.reference_data.locations.get(keyword=q, subType=["CITY"])`
-- Map Amadeus response to `DestinationResult` schema
-- For IATA code: use the `iataCode` field from Amadeus response
-- For lat/lng: use `geoCode.latitude` and `geoCode.longitude` from Amadeus
-- Return max **10** results
-- Validate: `q` must be at least 3 characters, otherwise return 400
-
-**Error Cases**:
-- `q` missing or < 3 chars → 400 `{"error": "bad_request", "message": "Query parameter 'q' must be at least 3 characters"}`
-- Amadeus API error → 500
-- Amadeus timeout (>10s) → 504
-
-### 4.2 POST /api/v1/flights/price
-
-**Purpose**: Get lowest round-trip economy flight price.
-
-**Implementation**:
-- Use the `amadeus` Python package
-- Use Flight Offers Search: `amadeus.shopping.flight_offers_search.get(originLocationCode=..., destinationLocationCode=..., departureDate=..., returnDate=..., adults=traveler_count, travelClass="ECONOMY", max=1)`
-- Extract the lowest price from the response
-- Return price **per person** (Amadeus returns total; divide by traveler_count if needed)
-- `currency` is always `"USD"`
-- Validate: `departure_date` must be in the future, `return_date` must be after `departure_date`
-
-**Error Cases**:
-- Past dates → 400
-- return_date <= departure_date → 400
-- No flights found → 404 `{"error": "not_found", "message": "No flights found for {origin} → {destination} on {departure_date}"}`
-- Amadeus error → 500
-- Timeout → 504
-
-### 4.3 POST /api/v1/hotels/search
-
-**Purpose**: Search hotels near destination, return top 5 by price.
-
-**Implementation**:
-- Use `httpx` to call LiteAPI (REST API)
-- LiteAPI docs: `https://docs.liteapi.travel/`
-- **Two API keys** (check `settings`):
-  - `settings.LITEAPI_API_KEY_SEARCH` — for hotel search
-  - `settings.LITEAPI_API_KEY_RATES` — for hotel pricing/rates
-- Room calculation: `rooms_needed = ceil(traveler_count / 2)` (import `math.ceil`)
-- Search parameters: destination coordinates, checkin/checkout dates, rooms count
-- Sort results by `total_price` ascending
-- Return top 5 results mapped to `HotelOption` schema
-- `total_price` = price per room per night * rooms_needed * number of nights
-- `distance` and `rating` can be `None` if LiteAPI doesn't provide them
-- **Validate API response before mapping**: if expected fields are missing, use None/default values rather than crashing
-
-**Error Cases**:
-- checkin_date >= checkout_date → 400
-- No hotels found → 404
-- LiteAPI error → 500
-- Timeout → 504
-
-### 4.4 POST /api/v1/weather
-
-**Purpose**: Get historical weather data and calculated weather score.
-
-**Implementation**:
-- Use `httpx` to call Open-Meteo Historical Weather API (FREE, no API key needed)
-- Base URL: `https://archive-api.open-meteo.com/v1/archive`
-- **Critical**: Fetch data for the **same date range in the PREVIOUS YEAR**
-  - Example: request dates 2026-05-01 to 2026-05-05 → fetch 2025-05-01 to 2025-05-05
-- Query params: `latitude`, `longitude`, `start_date`, `end_date`, `daily=temperature_2m_max,temperature_2m_min,rain_sum`, `timezone=auto`
-- Map response to `WeatherDay` objects:
-  - `temp_high` = `temperature_2m_max`
-  - `temp_low` = `temperature_2m_min`
-  - `rain_mm` = `rain_sum` (use `0.0` if null/missing)
-  - `description` = derive from conditions (e.g., rain > 5mm → "Rainy", rain > 0 → "Partly cloudy", else "Clear sky")
-- Calculate `WeatherSummary`:
-  - `average_temp` = mean of `(temp_high + temp_low) / 2` across all days
-
-**Weather Score Formula** (implement exactly):
-```python
-# Per-day calculation:
-avg_temp_day = (temp_high + temp_low) / 2
-temp_score = max(0, 100 - abs(avg_temp_day - 22) * 5)
-rain_score = max(0, 100 - rain_mm * 10)
-day_score = 0.6 * temp_score + 0.4 * rain_score
-
-# Final weather_score = average of all day_scores
-weather_score = sum(day_scores) / len(day_scores)
-```
-
-**Rain Signal** (based on avg daily rain across the range):
-- avg daily rain < 2mm → `"low"`
-- avg daily rain 2–5mm → `"medium"`
-- avg daily rain > 5mm → `"high"`
-
-**Weather Label** (based on weather_score):
-- score >= 80 → `"Great"`
-- score >= 60 → `"Good"`
-- score >= 40 → `"Fair"`
-- score < 40 → `"Poor"`
-
-### 4.5 POST /api/v1/calendar
-
-**Purpose**: Weather data for calendar UI overlay.
-
-**Implementation**:
-- Same Open-Meteo Historical API as weather endpoint
-- Fetch last year's data for the requested date range (typically 2 months)
-- For each day, calculate individual `weather_label` using the same scoring formula
-- Map to `CalendarDay` objects (temp_high, temp_low, rain_mm, weather_label)
-- Return wrapped in `CalendarResponse` with destination name
-
-### 4.6 POST /api/v1/compare
-
-**Purpose**: Score and rank trip options.
-
-**Implementation**:
-- Receive `CompareRequest` body with 2–5 `CompareOptionInput` items
-- Validate: at least 2 options required, otherwise 422
-
-**Scoring Pipeline** (implement in this exact order):
-```python
-# Step 1: Calculate costs
-for option in options:
-    total_trip_cost = option.flight_price * option.traveler_count + option.hotel_price
-    cost_per_person = total_trip_cost / option.traveler_count
-
-# Step 2: Cost score (linear interpolation)
-costs = [o.total_trip_cost for o in options]
-min_cost, max_cost = min(costs), max(costs)
-for option in options:
-    if max_cost == min_cost:
-        cost_score = 100
-    else:
-        cost_score = 100 * (max_cost - option.total_trip_cost) / (max_cost - min_cost)
-
-# Step 3: Overall score
-overall_score = 0.7 * cost_score + 0.3 * option.weather.weather_score
-
-# Step 4: Assign tags
-# cheapest → lowest total_trip_cost
-# best_weather → highest weather_score
-# best_overall → highest overall_score
-# An option can have multiple tags
-
-# Step 5: Sort by overall_score descending
-# Step 6: best_option_index = 0 (always first after sort)
-```
-
-- Return `CompareResponse` with sorted options and `best_option_index: 0`
-
----
-
-## 5. External API Integration Details
-
-### 5.1 Amadeus
-
+**Amadeus** (flights + city search):
 ```python
 from amadeus import Client, ResponseError
 
@@ -292,107 +137,52 @@ amadeus = Client(
     client_id=settings.AMADEUS_API_KEY,
     client_secret=settings.AMADEUS_API_SECRET,
 )
-```
-
-- **City Search**: `amadeus.reference_data.locations.get(keyword=query, subType=["CITY"])`
-- **Flight Search**: `amadeus.shopping.flight_offers_search.get(...)`
-- The `amadeus` package handles OAuth token refresh automatically
-- Amadeus test environment: use test credentials from `.env`
-
-### 5.2 LiteAPI
-
-```python
-import httpx
-
-# Two separate API keys for different operations:
-search_headers = {
-    "X-API-Key": settings.LITEAPI_API_KEY_SEARCH,
-}
-rates_headers = {
-    "X-API-Key": settings.LITEAPI_API_KEY_RATES,
-}
-
-async with httpx.AsyncClient(timeout=10.0) as client:
-    # Use search key for hotel search
-    response = await client.get(
-        "https://api.liteapi.travel/v3.0/data/hotels",
-        headers=search_headers,
-        params={...},
-    )
-    # Use rates key for pricing
-    response = await client.get(
-        "https://api.liteapi.travel/v3.0/hotels/rates",
-        headers=rates_headers,
-        params={...},
-    )
-```
-
-- Check LiteAPI docs for exact endpoint paths and parameter names
-- **Always validate the response** before mapping: check for expected keys, handle missing fields gracefully
-
-### 5.3 Open-Meteo (Free, No Auth)
-
-```python
-import httpx
-
-async with httpx.AsyncClient(timeout=10.0) as client:
-    response = await client.get(
-        "https://archive-api.open-meteo.com/v1/archive",
-        params={
-            "latitude": lat,
-            "longitude": lon,
-            "start_date": "2025-05-01",
-            "end_date": "2025-05-05",
-            "daily": "temperature_2m_max,temperature_2m_min,rain_sum",
-            "timezone": "auto",
-        },
-    )
-```
-
-### 5.4 Assumption Verification Protocol
-
-**Before implementing each service**, call the real API once with test data:
-
-```python
-# Example: test Amadeus city search
-response = amadeus.reference_data.locations.get(
-    keyword="Tokyo", subType=["CITY"]
+# City Search:
+amadeus.reference_data.locations.get(keyword=query, subType=["CITY"])
+# Flight Search:
+amadeus.shopping.flight_offers_search.get(
+    originLocationCode=..., destinationLocationCode=...,
+    departureDate=..., returnDate=...,
+    adults=traveler_count, travelClass="ECONOMY", max=1,
 )
-print(response.data)  # Examine actual structure
+# SDK handles OAuth token refresh automatically
 ```
 
-If the actual response structure differs from what you expected:
+**LiteAPI** (hotels) — uses `httpx`, TWO separate API keys:
+```python
+# settings.LITEAPI_API_KEY_SEARCH — for GET /data/hotels
+# settings.LITEAPI_API_KEY_RATES  — for POST /hotels/min-rates
+# Auth header: "X-API-Key"
+# Base URL: https://api.liteapi.travel/v3.0
+# Refer to https://docs.liteapi.travel/ for exact endpoints and params
+```
+
+**Open-Meteo** (weather) — free, no auth, uses `httpx`:
+```python
+# Base URL: https://archive-api.open-meteo.com/v1/archive
+# Params: latitude, longitude, start_date, end_date,
+#   daily=temperature_2m_max,temperature_2m_min,rain_sum, timezone=auto
+# CRITICAL: fetch PREVIOUS YEAR's data for the requested dates
+```
+
+### Assumption Verification Protocol
+
+**Before implementing each service**, call the real API once with test data. If the actual response structure differs from what you expected:
 1. Log the actual structure in `backend/PROGRESS.md`
 2. Adapt your mapping code to handle the real structure
 3. If the difference means the Pydantic schema can't work → **STOP and report**
 
----
+### Error Handling
 
-## 6. Error Handling
+Error format and status codes are defined in `docs/api-spec.yaml` under `components/responses` and `components/schemas/ErrorResponse`. Implement them exactly as specified.
 
-All errors must use this format:
-```json
-{"error": "<machine_readable_code>", "message": "<human_readable_description>"}
-```
-
-Error codes per status:
-- `400` → `"bad_request"` — invalid input (missing params, past dates, etc.)
-- `404` → `"not_found"` — no results from external API
-- `422` → `"validation_error"` — semantic validation failure (e.g., < 2 compare options)
-- `500` → `"internal_error"` — unexpected error
-- `504` → `"gateway_timeout"` — external API call exceeded 10s
-
-Use FastAPI's `HTTPException` or a custom error response. The frontend expects this exact JSON structure.
-
-### External API Response Validation
 Always validate external API responses before mapping to Pydantic models:
-- If a field is missing, use the default/nullable value from the schema (`None`, `0.0`, etc.)
-- Never assume external APIs return exactly what their docs say
+- If a field is missing, use the default/nullable value from the schema
 - Wrap external API calls in try/except and return appropriate error codes
 
 ---
 
-## 7. Recovery Protocol
+## 5. Recovery Protocol
 
 If an external API call fails during development:
 
@@ -411,7 +201,7 @@ If an external API call fails during development:
 
 ---
 
-## 8. Code Style Rules
+## 6. Code Style Rules
 
 Follow `CLAUDE.md` conventions:
 - **Linter**: ruff (line-length 80)
@@ -421,7 +211,7 @@ Follow `CLAUDE.md` conventions:
 
 ---
 
-## 9. Progress Tracking
+## 7. Progress Tracking
 
 After completing each phase, append to `backend/PROGRESS.md`:
 
@@ -450,84 +240,21 @@ This file serves as persistent memory across context rotations. Future sessions 
 
 ---
 
-## 10. Self-Verification
+## 8. Self-Verification
 
-After implementation is complete, verify every endpoint works by running these commands. **All must return valid JSON matching the schema.**
+After implementation is complete, verify every endpoint works:
 
-```bash
-# 0. Health check
-curl -s http://localhost:8000/health
+1. **Read `docs/api-spec.yaml`** — every endpoint has `example` payloads in the spec
+2. **Generate curl commands** from the spec's examples for each endpoint
+3. **Test all happy paths** — every endpoint must return 200 with valid JSON matching its schema
+4. **Test all error cases** — the spec defines error responses (400, 404, 422, 504) with examples; verify each one
+5. **Verify Swagger UI** — `http://localhost:8000/docs` must show all endpoints
 
-# 1. Destination search
-curl -s "http://localhost:8000/api/v1/search/destinations?q=Tokyo"
-
-# 2. Flight price
-curl -s -X POST http://localhost:8000/api/v1/flights/price \
-  -H "Content-Type: application/json" \
-  -d '{"origin":"ICN","destination":"NRT","departure_date":"2026-05-01","return_date":"2026-05-05","traveler_count":2}'
-
-# 3. Hotel search
-curl -s -X POST http://localhost:8000/api/v1/hotels/search \
-  -H "Content-Type: application/json" \
-  -d '{"destination":"Tokyo","latitude":35.6762,"longitude":139.6503,"checkin_date":"2026-05-01","checkout_date":"2026-05-05","traveler_count":2}'
-
-# 4. Weather
-curl -s -X POST http://localhost:8000/api/v1/weather \
-  -H "Content-Type: application/json" \
-  -d '{"latitude":35.6762,"longitude":139.6503,"start_date":"2026-05-01","end_date":"2026-05-05"}'
-
-# 5. Calendar
-curl -s -X POST http://localhost:8000/api/v1/calendar \
-  -H "Content-Type: application/json" \
-  -d '{"destination":"Tokyo","latitude":35.6762,"longitude":139.6503,"start_date":"2026-05-01","end_date":"2026-06-30"}'
-
-# 6. Compare
-curl -s -X POST http://localhost:8000/api/v1/compare \
-  -H "Content-Type: application/json" \
-  -d '{
-    "options": [
-      {
-        "destination": "Tokyo",
-        "start_date": "2026-05-01",
-        "end_date": "2026-05-05",
-        "flight_price": 342.50,
-        "hotel_name": "Tokyo Inn",
-        "hotel_price": 320.00,
-        "weather": {"average_temp": 21.3, "rain_signal": "low", "weather_score": 82.4, "label": "Great"},
-        "traveler_count": 2
-      },
-      {
-        "destination": "Tokyo",
-        "start_date": "2026-05-15",
-        "end_date": "2026-05-19",
-        "flight_price": 289.00,
-        "hotel_name": "Tokyo Inn",
-        "hotel_price": 295.00,
-        "weather": {"average_temp": 23.8, "rain_signal": "medium", "weather_score": 68.2, "label": "Good"},
-        "traveler_count": 2
-      }
-    ]
-  }'
-
-# 7. Error cases — all must return {"error": "...", "message": "..."}
-
-# Bad request (missing q)
-curl -s "http://localhost:8000/api/v1/search/destinations"
-
-# Not found (unlikely route)
-curl -s -X POST http://localhost:8000/api/v1/flights/price \
-  -H "Content-Type: application/json" \
-  -d '{"origin":"XXX","destination":"YYY","departure_date":"2026-05-01","return_date":"2026-05-05"}'
-
-# Validation error (only 1 compare option)
-curl -s -X POST http://localhost:8000/api/v1/compare \
-  -H "Content-Type: application/json" \
-  -d '{"options": [{"destination":"Tokyo","start_date":"2026-05-01","end_date":"2026-05-05","flight_price":342.50,"hotel_name":"Inn","hotel_price":320.00,"weather":{"average_temp":21.3,"rain_signal":"low","weather_score":82.4,"label":"Great"},"traveler_count":2}]}'
-```
+The spec is the source of truth for test data. Do NOT hardcode test payloads — derive them from the spec's `example` fields.
 
 ---
 
-## 11. Completion Checklist
+## 9. Completion Checklist
 
 **You are NOT done until ALL of these are true:**
 
@@ -546,7 +273,7 @@ curl -s -X POST http://localhost:8000/api/v1/compare \
 
 ---
 
-## 12. Key Files Reference
+## 10. Key Files Reference
 
 | File | Role | Permission |
 |------|------|------------|
@@ -562,7 +289,7 @@ curl -s -X POST http://localhost:8000/api/v1/compare \
 
 ---
 
-## 13. Reminders
+## 11. Reminders
 
 1. **Do not modify frozen files** (`schemas.py`, `api-spec.yaml`, `config.py`) without reporting
 2. **Use real API keys** from `.env` — they are already configured
@@ -571,7 +298,7 @@ curl -s -X POST http://localhost:8000/api/v1/compare \
 5. **Timeout**: 10 seconds for all external API calls
 6. **Date format**: ISO 8601 (`YYYY-MM-DD`) everywhere
 7. **Currency**: USD, always
-8. **No tests needed** — verify with curl commands in Section 10
+8. **No tests needed** — verify with curl commands in Section 8
 9. **No auth** — all endpoints are public
 10. **CORS** is already configured for `localhost:3000`
 11. If `docker compose up` fails after your changes, fix it before moving to the next phase
