@@ -1,8 +1,6 @@
 // frontend/src/lib/api.ts
 // Centralized API service layer — all backend calls go through this file.
 
-'use client';
-
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { API_BASE_URL } from '@/types/constants';
 import type {

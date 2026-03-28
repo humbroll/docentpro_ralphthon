@@ -79,19 +79,19 @@ export function ComparisonQueueProvider({ children }: { children: React.ReactNod
 
   const addItem = useCallback(
     (item: ComparisonQueueItem): boolean => {
-      if (queue.length >= MAX_QUEUE_SIZE) {
-        return false;
-      }
-      if (queue.some((existing) => existing.id === item.id)) {
-        return false;
-      }
-      setQueue((prev) => [...prev, item]);
-      if (comparisonResult.state !== 'idle') {
+      let added = false;
+      setQueue((prev) => {
+        if (prev.length >= MAX_QUEUE_SIZE) return prev;
+        if (prev.some((existing) => existing.id === item.id)) return prev;
+        added = true;
+        return [...prev, item];
+      });
+      if (added && comparisonResult.state !== 'idle') {
         resetComparison();
       }
-      return true;
+      return added;
     },
-    [queue, comparisonResult.state, resetComparison]
+    [comparisonResult.state, resetComparison]
   );
 
   const removeItem = useCallback(

@@ -107,21 +107,24 @@ export function ComparisonSection() {
       {comparisonResult.state === 'success' && comparisonResult.data && (
         <Box sx={{ mt: 3 }}>
           {/* Winner Banner */}
-          {comparisonResult.data.options.length > 0 && (
-            <Alert
-              icon={<EmojiEventsIcon />}
-              severity="success"
-              sx={{ mb: 3 }}
-            >
-              <Typography variant="subtitle1" fontWeight={600}>
-                Best Overall: {comparisonResult.data.options[comparisonResult.data.best_option_index].destination},{' '}
-                {dayjs(comparisonResult.data.options[comparisonResult.data.best_option_index].start_date).format('MMM D')}
-                &ndash;
-                {dayjs(comparisonResult.data.options[comparisonResult.data.best_option_index].end_date).format('MMM D, YYYY')}
-                {' '}&mdash; Score: {comparisonResult.data.options[comparisonResult.data.best_option_index].overall_score.toFixed(1)}
-              </Typography>
-            </Alert>
-          )}
+          {(() => {
+            const bestOption = comparisonResult.data!.options[comparisonResult.data!.best_option_index];
+            return bestOption ? (
+              <Alert
+                icon={<EmojiEventsIcon />}
+                severity="success"
+                sx={{ mb: 3 }}
+              >
+                <Typography variant="subtitle1" fontWeight={600}>
+                  Best Overall: {bestOption.destination},{' '}
+                  {dayjs(bestOption.start_date).format('MMM D')}
+                  &ndash;
+                  {dayjs(bestOption.end_date).format('MMM D, YYYY')}
+                  {' '}&mdash; Score: {bestOption.overall_score.toFixed(1)}
+                </Typography>
+              </Alert>
+            ) : null;
+          })()}
 
           {/* Score Summary Chips */}
           <Stack direction="row" spacing={1} sx={{ mb: 3 }} flexWrap="wrap" useFlexGap>

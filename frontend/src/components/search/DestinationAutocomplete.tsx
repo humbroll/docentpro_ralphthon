@@ -71,8 +71,8 @@ export function DestinationAutocomplete({ value, onChange, error }: DestinationA
       inputValue={inputValue}
       onInputChange={(_e, newInput, reason) => {
         if (reason === 'input') handleInputChange(newInput);
-        if (reason === 'clear') {
-          setInputValue('');
+        if (reason === 'clear' || reason === 'reset') {
+          setInputValue(newInput);
           setOptions([]);
           setFetchError(undefined);
         }

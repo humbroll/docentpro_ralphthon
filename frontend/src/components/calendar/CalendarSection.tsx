@@ -80,6 +80,7 @@ export function CalendarSection({
   }, [calendarWeather.data]);
 
   const handleDayClick = (date: dayjs.Dayjs) => {
+    if (date.isBefore(dayjs().startOf('day'))) return;
     if (!startDate || (startDate && endDate)) {
       setStartDate(date);
       setEndDate(null);
