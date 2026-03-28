@@ -1,10 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Grid from '@mui/material/Grid';
 import { SearchSection } from '@/components/search/SearchSection';
 import { CalendarSection } from '@/components/calendar/CalendarSection';
 import { DateOptionBuilderSection } from '@/components/dateOption/DateOptionBuilderSection';
 import { ComparisonSection } from '@/components/comparison/ComparisonSection';
+import { QueueItemCard } from '@/components/comparison/QueueItemCard';
 import { SectionContainer } from '@/components/layout/SectionContainer';
 import { useComparisonQueue } from '@/context/ComparisonQueueContext';
 import { getFlightPrice, searchHotels, getWeather, extractApiError } from '@/lib/api';
@@ -34,8 +38,8 @@ export default function HomePage() {
   const [dateDetailResults, setDateDetailResults] = useState<DateDetailResults>(INITIAL_DETAIL_RESULTS);
   const [selectedHotel, setSelectedHotel] = useState<HotelOption | null>(null);
 
-  // ── Queue count for progressive reveal ──
-  const { count: queueCount } = useComparisonQueue();
+  // ── Queue for progressive reveal + inline display ──
+  const { queue, count: queueCount, removeItem } = useComparisonQueue();
 
   // ── Derived visibility ──
   const showCalendar = selectedDestination !== null;
@@ -200,6 +204,22 @@ export default function HomePage() {
 
       {/* Section 3: Date Details (after date range confirmed) */}
       <SectionContainer visible={showDateDetails}>
+        {/* Queued options summary */}
+        {queueCount > 0 && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+              Queued for comparison ({queueCount})
+            </Typography>
+            <Grid container spacing={1.5}>
+              {queue.map((item) => (
+                <Grid key={item.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                  <QueueItemCard item={item} onRemove={removeItem} />
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
+
         {selectedDestination && dateRange && (
           <DateOptionBuilderSection
             destination={selectedDestination}
